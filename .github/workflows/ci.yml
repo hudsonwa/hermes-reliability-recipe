@@ -1,0 +1,19 @@
+name: ground-truth
+on:
+  push:
+  pull_request:
+jobs:
+  gt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: quick GT + scrub
+        run: make test-quick
+      - name: fetch truth (linux)
+        run: make fetch-truth
+      - name: truth version
+        run: ./recipe/bin/truth --version || ./recipe/bin/truth --help | head -5

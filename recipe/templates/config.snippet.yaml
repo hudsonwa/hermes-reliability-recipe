@@ -1,0 +1,36 @@
+# hermes-reliability-recipe — config reference
+# =============================================
+# This file is REFERENCE ONLY. The toggle script applies these settings
+# to your config.yaml automatically. You do not need to copy or merge
+# this file manually.
+#
+# It is here so you can see exactly what gets added to your config
+# when you run: ./scripts/reliability-toggle.sh on --profile YOUR_PROFILE
+#
+# model:
+#   default: YOUR_MODEL_ID
+#   provider: custom   # or openrouter / anthropic / etc.
+#   base_url: https://YOUR_ENDPOINT/v1
+#   api_key: ""        # prefer .env
+#
+# agent:
+#   verify_on_stop: true
+#   max_verify_nudges: 3
+#   tool_use_enforcement: true   # soft: call tools, don't only describe them
+#   coding_instructions: "(filled by toggle)"
+#
+# hooks:
+#   pre_verify:
+#     - command: "<python> <profile>/bin/pre_verify_claim_gate.py"
+#       timeout: 15
+# hooks_auto_accept: true   # accept the gate hook; not full YOLO
+#
+# mcp_servers:
+#   truth:
+#     command: "<profile>/bin/truth-mcp"
+#     args: []
+#     timeout: 60
+#
+# SAFE DEFAULT: do not set approvals.mode: off unless you understand the risk.
+# Lab machines may use:
+# CONFIRM_LAB_YOLO=I_UNDERSTAND LAB_YOLO=1 ./scripts/install.sh --profile NAME --lab-yolo

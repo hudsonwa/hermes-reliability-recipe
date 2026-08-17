@@ -1,0 +1,6 @@
+# Copy to scripts/scrub-needles.local (gitignored) on maintainer machines.
+# One literal needle per line. Never put real values in the committed example.
+# /Users/YOU
+# Your Full Name
+# your-nas-hostname
+# YOUR_TELEGRAM_USER_ID

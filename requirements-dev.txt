@@ -1,0 +1,4 @@
+# Development/test dependencies for the reliability recipe.
+# Install: pip install -r requirements-dev.txt
+pyyaml>=6.0
+pytest>=8.0

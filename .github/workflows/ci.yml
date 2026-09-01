@@ -1,19 +1,41 @@
-name: ground-truth
+name: ci
+
 on:
   push:
+    branches: [main]
   pull_request:
+
 jobs:
-  gt:
-    runs-on: ubuntu-latest
+  test:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: setup python
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: quick GT + scrub
-        run: make test-quick
-      - name: fetch truth (linux)
-        run: make fetch-truth
-      - name: truth version
-        run: ./recipe/bin/truth --version || ./recipe/bin/truth --help | head -5
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Bash syntax (every .sh)
+        run: |
+          fail=0
+          for f in $(git ls-files '*.sh'); do bash -n "$f" || { echo "BASHFAIL $f"; fail=1; }; done
+          exit $fail
+
+      - name: Python compile (every .py)
+        run: |
+          fail=0
+          for f in $(git ls-files '*.py'); do python3 -m py_compile "$f" || { echo "PYFAIL $f"; fail=1; }; done
+          exit $fail
+
+      - name: Unit tests (gate + seam ledger)
+        run: python3 -m pytest recipe/bin/ -q
+
+      - name: Scrub check (no private needles)
+        run: bash scripts/check-scrub.sh
+
+      - name: GT suite (hermetic)
+        run: bash scripts/gt_suite.sh

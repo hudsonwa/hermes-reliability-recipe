@@ -13,6 +13,10 @@ source "$SCRIPT_DIR/lib.sh"
 PROFILE="${PROFILE:-}"
 RESTART=0
 ACTION="${1:-status}"
+case "$ACTION" in
+  status|on|off) ;;
+  --*) echo "First argument must be status|on|off (got \"$ACTION\"). Example: $0 on --profile NAME" >&2; exit 2 ;;
+esac
 shift || true
 while [[ $# -gt 0 ]]; do
   case "$1" in

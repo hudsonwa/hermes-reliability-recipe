@@ -105,6 +105,13 @@ That takes the detector out of that profile. The Hermes patch is global, so unin
 
 You need [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) already working, plus bash and Python 3.10+.
 
+The scripts and tests also need **PyYAML** (Hermes' own Python already ships it,
+but a bare `python3` may not have it):
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+```
+
 Hermes itself runs on macOS, Linux, Windows, and WSL. **This recipe’s scripts want bash.** On Windows use **WSL2**. Ubuntu/Debian show up in the docs only because the optional receipt binary wants a modern Linux C library — not because Hermes needs those distros. See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ```bash
@@ -176,6 +183,8 @@ Set in the profile `.env` or the environment:
 |----------|---------|
 | `CLAIM_GATE_FOREIGN_EXTRA` | Extra “wrong project” test-suite names, comma-separated |
 | `CLAIM_GATE_LOG` | Where hits are appended as JSON lines |
+| `CLAIM_GATE_FOREIGN_EXTRA` | Extra wrong-tree markers (comma-separated regexes) — machine-specific incident patterns belong here, not in the defaults |
+| `CLAIM_GATE_STATS_EXTRA` | Extra planted-stat patterns (comma-separated regexes) |
 | `CLAIM_GATE_CWD` | Directory used to bind “tests passed” to *this* tree |
 
 ### Optional: stage a lie on purpose
@@ -196,13 +205,17 @@ See [extras/README.md](extras/README.md). Not required for daily use.
 | `scripts/install.sh` / `reliability-toggle.sh` / `uninstall.sh` / `doctor.sh` | Lifecycle |
 | `scripts/apply-hermes-preverify-patch.sh` | Optional always-on hook |
 | `scripts/reliability-selfheal.sh` | Known-fix repair loop |
+| `recipe/bin/claim_auditor.py` | Offline scenario scorer ("did my agent lie in a fake scenario?") |
+| `recipe/bin/seam_ledger.py` | Machine seam ledger for finish-line claims (with unit tests) |
 | `INSTALL_PHASES.md` + `AGENTS.md` | Stamp protocol for weak installers |
 | `SECURITY.md` | What we hardened, what we still do not claim |
 
 Never commit real `.env` files, chat exports, or personal notes.
 
-### More docs
+### Documentation
 
+- [docs/FEATURES.md](docs/FEATURES.md) — the full feature list (what each
+  piece does, where it lives, which test covers it)
 - [RELIABILITY.md](docs/RELIABILITY.md) — design notes
 - [HERMES-PATCH.md](docs/HERMES-PATCH.md) — the global patch
 - [UNINSTALL.md](docs/UNINSTALL.md) · [TOGGLE.md](docs/TOGGLE.md) · [DOCTOR.md](docs/DOCTOR.md) · [SELF-HEAL.md](docs/SELF-HEAL.md)
@@ -210,11 +223,6 @@ Never commit real `.env` files, chat exports, or personal notes.
 - [THREAT_MODEL.md](docs/THREAT_MODEL.md) · [SECURITY.md](SECURITY.md)
 - [LONG_LOOPS.md](docs/LONG_LOOPS.md) · [UPSTREAM_SYNC.md](docs/UPSTREAM_SYNC.md)
 - [GITHUB_PUBLISH.md](docs/GITHUB_PUBLISH.md) — how this tree is released
-
-### Documentation
-
-- [docs/FEATURES.md](docs/FEATURES.md) — the full feature list (what each
-  piece does, where it lives, which test covers it)
 - [docs/WHY-2026-09-01.md](docs/WHY-2026-09-01.md) — the incident-driven
   rationale for the latest round of improvements (anonymized, with the A/B
   evidence)

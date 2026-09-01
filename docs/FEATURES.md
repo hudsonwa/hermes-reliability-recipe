@@ -6,7 +6,7 @@ stopping, soft rules do the persuading, evidence files do the remembering.**
 
 ## 1. Always-on claim gate (`pre_verify`)
 
-A per-profile LLM judge inspects every final agent answer for success claims
+A per-profile deterministic Python check (no LLM, no API calls) inspects every final agent answer for success claims
 ("done", "all tests pass", "verified") that lack a named check or receipt, and
 forces an in-turn correction before the message ships. A one-line core patch
 removes the stock edit-gating so the gate fires on **every** turn — not only
@@ -56,13 +56,17 @@ across profiles on a machine (verify_on_stop, enforcement mode, hook presence,
 gate binary on disk) and fails on drift or missing pieces. Catches the
 "config clobber" failure class mechanically instead of by manual audit.
 
-## 7. Update-proof pin kit
+## 7. Update-proof deployment pattern (operator-side)
 
-The one-line core patch is committed to a local branch (`reliability-stack-local`),
-tagged, and exported as a raw `.patch` **outside the repo** with a SHA256
-manifest (`~/.hermes/reliability-pins/`). `anchor-probe.sh` checks that the
-hook symbols the whole stack depends on still exist after any `hermes update`
-— catching upstream refactors that a merge conflict never shows.
+When this stack is deployed on a machine, the operator is advised to pin the
+applied Hermes patch: a dedicated branch + tag holding the patch, the exported
+`.patch` file with a SHA256SUMS manifest, and an anchor probe that re-checks
+the patched call sites after every Hermes update. The stack then largely
+self-heals: self-heal detects patch drift and re-applies the patch
+(GT10 in `scripts/gt_suite.sh`), and a full post-update doctor run verifies
+the rest. The pin/doctor scripts live in the operator's deployment kit, not
+in this repo — this repo ships the building blocks (patch applier, doctor,
+self-heal, GT suite).
 
 ## 8. Update doctor (post-update + weekly)
 

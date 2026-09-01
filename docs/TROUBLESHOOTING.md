@@ -38,6 +38,21 @@ Ubuntu/Debian appear in *this* repo only for:
 
 Claim gate alone does not require a new distro.
 
+### `ModuleNotFoundError: No module named 'yaml'`
+
+The gate, doctor, and GT suite import PyYAML. A bare system `python3` may not
+have it (Hermes' own venv does).
+
+**Fix:** install the declared dev dependencies with the same Python that runs
+the scripts:
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+```
+
+If Hermes' bundled venv is used instead, ensure PyYAML inside it:
+`~/.hermes/hermes-agent/venv/bin/python -m pip install pyyaml`.
+
 ### `python3: command not found` but Hermes works
 
 uv/Hermes often installs `python3.11` without a `python3` name.

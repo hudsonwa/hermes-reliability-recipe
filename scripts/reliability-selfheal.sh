@@ -48,11 +48,13 @@ fi
 mkdir -p "$HOME_P/logs" "$HOME_P/scripts" "$HOME_P/bin" "$HOME_P/state"
 
 diagnose() {
-  HOME_P="$HOME_P" RECIPE="$RECIPE_ROOT" "$PY" - <<'PY'
-import json, os, sys
+  HOME_P="$HOME_P" RECIPE="$RECIPE_ROOT" HERMES_ROOT="${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}" "$PY" - <<'PY'
+import json, os, re, sys
 from pathlib import Path
+import yaml
 home = Path(os.environ["HOME_P"])
 recipe = Path(os.environ.get("RECIPE", "")).expanduser()
+hermes_root = Path(os.environ.get("HERMES_ROOT", "")).expanduser()
 cfg_path = home / "config.yaml"
 state_path = home / "state" / "reliability-stack.json"
 issues = []
@@ -106,6 +108,21 @@ else:
     if marker not in ws or "LIE/HALLUCINATION" not in ws or "truth_run_wrap" not in ws.lower():
         issues.append("working_style_soft_missing")
 
+# Hermes patch-drift check: an update restores the edit-gated pre_verify
+# condition, silently degrading the gate to edit-turns-only. Diagnose it so
+# self-heal can re-apply; doctor.sh already fails on the same condition.
+loop = hermes_root / "agent" / "conversation_loop.py"
+if loop.exists():
+    text = loop.read_text(errors="replace")
+    edit_gated = re.search(
+        r'if\s+_edited\s+and\s+has_hook\(\s*["\']pre_verify["\']\s*\)', text
+    )
+    always_on = re.search(
+        r'if\s+has_hook\(\s*["\']pre_verify["\']\s*\)', text
+    )
+    if edit_gated or not always_on:
+        issues.append("pre_verify_patch_drift")
+
 print(json.dumps({"ok": len(issues) == 0, "issues": issues, "home": str(home)}))
 PY
 }
@@ -144,6 +161,16 @@ if [[ -f "$RECIPE_ROOT/recipe/templates/working-style-instruction.md" ]]; then
     else
       HEAL_ACTIONS+=("restored_working_style_soft_failed:$ws_h")
     fi
+  fi
+fi
+# Re-apply the always-on pre_verify patch when an update wiped it. The patched
+# file is global to the Hermes install; one apply covers every profile here.
+PATCH_SCRIPT="$RECIPE_ROOT/scripts/apply-hermes-preverify-patch.sh"
+if [[ -x "$PATCH_SCRIPT" ]] && ! bash "$PATCH_SCRIPT" --check >/dev/null 2>&1; then
+  if bash "$PATCH_SCRIPT" --apply >/tmp/hrr-selfheal-patch.out 2>&1; then
+    HEAL_ACTIONS+=("reapplied_pre_verify_patch")
+  else
+    HEAL_ACTIONS+=("reapplied_pre_verify_patch_failed")
   fi
 fi
 for s in reliability-selfheal.sh doctor.sh reap-stale-hermes.sh lib.sh reliability-toggle.sh; do

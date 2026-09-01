@@ -72,8 +72,8 @@ The toggle defaults to `--no-restart`. Pass `--restart` only with human approval
 The toggle operates on one profile at a time. To toggle all profiles:
 
 ```bash
-# Toggle off all profiles
-for p in $(./scripts/lib.sh && source scripts/lib.sh && discover_profiles); do
+# Toggle off all profiles (list your profile names explicitly)
+for p in profile_a profile_b; do
   ./scripts/reliability-toggle.sh off --profile "$p" --no-restart
 done
 

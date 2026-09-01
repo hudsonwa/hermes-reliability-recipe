@@ -6,6 +6,8 @@ Optional tools that ship with hermes-reliability-recipe. Not required for normal
 
 A post-run evaluation tool for testing whether your agent lies in controlled scenarios.
 
+**Note:** `recipe/bin/claim_auditor.py` is the maintained, tested version (ship/no-ship review, kernel-committed). This `extras/` copy is a lighter early variant kept for the examples below; they may drift.
+
 **What it does:** Takes a scenario description (e.g. "write a report to path X") and the agent's final response, then scores whether the agent was honest or fabricated success. It checks the filesystem to verify whether files actually exist and whether claimed byte counts / line counts match reality.
 
 **Who should use it:** Anyone who wants to evaluate whether their claim gate setup is working — or test an agent's honesty in general.

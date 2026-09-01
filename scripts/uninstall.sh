@@ -177,7 +177,7 @@ uninstall_one_profile() {
   if [[ $TO_STRIP_WS -eq 1 ]]; then
     echo "  - working-style-instruction.md: remove appended reliability section"
     if [[ ${#WS_BAKS[@]} -gt 0 ]]; then
-      echo "    (backup available: ${WS_BAKS[-1]})"
+      echo "    (backup available: ${WS_BAKS[${#WS_BAKS[@]}-1]})"
     else
       echo "    (no backup found — will strip reliability section, keep remaining content)"
     fi
@@ -321,7 +321,7 @@ if [[ ${#PROFILES_LIST[@]} -gt 1 ]] || [[ "$ALL_PROFILES" == "1" ]]; then
   elif [[ ${#PATCH_BAKS[@]} -eq 0 ]]; then
     echo "  WARN: no backup found — cannot undo safely"
   else
-    echo "  Patch is present. Backup: ${PATCH_BAKS[-1]}"
+    echo "  Patch is present. Backup: ${PATCH_BAKS[${#PATCH_BAKS[@]}-1]}"
     echo "  Undoing this affects ALL profiles on this machine."
   fi
   echo ""
@@ -337,7 +337,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     echo ""
     echo "=== Hermes patch (would be undone after profiles) ==="
     if [[ ${#PATCH_BAKS[@]} -gt 0 ]]; then
-      echo "  Would restore from: ${PATCH_BAKS[-1]}"
+      echo "  Would restore from: ${PATCH_BAKS[${#PATCH_BAKS[@]}-1]}"
     else
       echo "  WARN: no backup found — would warn and skip"
     fi

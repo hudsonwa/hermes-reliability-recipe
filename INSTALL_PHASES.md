@@ -27,7 +27,8 @@ After doctor PASS you still need Phase 6 (model, secrets, start the messaging se
 command -v hermes && hermes --version
 command -v python3 && python3 --version
 python3 -c 'import yaml; print("yaml ok")' || \
-  ~/.hermes/hermes-agent/venv/bin/python -c 'import yaml; print("yaml ok")'
+  ~/.hermes/hermes-agent/venv/bin/python -c 'import yaml; print("yaml ok")' || \
+  { echo "PyYAML missing — fix: python3 -m pip install -r requirements-dev.txt" >&2; }
 test -f recipe/bin/pre_verify_claim_gate.py
 ```
 

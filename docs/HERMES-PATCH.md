@@ -50,7 +50,7 @@ Stock Hermes only runs `pre_verify` when the agent edited files during that turn
 
 | Tradeoff | Pro | Con |
 |----------|-----|-----|
-| Every turn gets gated | Catches pure-hallucination lies (the main threat) | Gate runs on every final answer, even simple chat. In practice it's fast — regex + filesystem checks, under 15ms. |
+| Every turn gets gated | Catches pure-hallucination lies (the main threat) | Gate runs on every final answer, even simple chat. It's fast — regex + filesystem checks; typically low tens of milliseconds per check (a strict benchmark on one dev machine measured ~26 ms process-inclusive). |
 | Modifies upstream Hermes | Fixes a real gap in pre_verify behavior | Not an official change. Breaks on every Hermes upgrade — you must re-apply. |
 | Global, not per-profile | One patch covers all profiles | Can't have some profiles gated and others not (unless you toggle hooks per-profile in config, which the recipe already does) |
 | Regex-based patch | Works across versions that keep the same code pattern | Fragile — if Hermes changes variable names or condition structure, the patch can't find the pattern. Doctor will report FAIL and you re-apply manually. |

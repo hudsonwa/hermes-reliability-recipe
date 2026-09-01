@@ -39,7 +39,25 @@ def test_wrong_tree_151_blocked():
     final = (
         "All 151 tests passed in hermes/phase1. Tests are green. Ship it."
     )
-    out = evaluate(final, 0, cwd="/tmp/myproj")
+    # Incident-style markers are operator-injected via env (CLAIM_GATE_FOREIGN_EXTRA),
+    # not shipped defaults. The gate reads the env per call, so setting it here works.
+    import os as _os
+    _os.environ["CLAIM_GATE_FOREIGN_EXTRA"] = r"151\s+passed|hermes/phase1"
+    try:
+        out = evaluate(final, 0, cwd="/tmp/myproj")
+    finally:
+        _os.environ.pop("CLAIM_GATE_FOREIGN_EXTRA", None)
+    assert out.get("action") == "continue", out  # "continue" = blocked, agent must redo
+    msg = out.get("message", "").lower()
+    assert (
+        "foreign" in msg
+        or "workspace" in msg
+        or "wrong-directory" in msg
+        or "not clearly bound" in msg
+        or "receipt" in msg
+    ), out
+    # Defaults still block this claim — via the generic receipts rule (no receipt
+    # bound to this workspace), not via any hardcoded "151 passed" marker.
     assert out.get("action") == "continue", out
     msg = out.get("message", "").lower()
     assert (

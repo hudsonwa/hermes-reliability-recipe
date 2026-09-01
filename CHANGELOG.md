@@ -2,7 +2,7 @@
 
 All notable changes to the reliability recipe. Dates are UTC.
 
-## [2] — 2026-09-01
+## v0.2.0 — 2026-09-01
 
 The hardening pass after a real production incident (three simultaneous
 degradations of the stack, documented in `docs/WHY-2026-09-01.md`).
@@ -32,8 +32,19 @@ degradations of the stack, documented in `docs/WHY-2026-09-01.md`).
 - **Test/log isolation**: the GT suite no longer writes test rows into the
   live `claim_gate_hits.jsonl`; tests run against a temp log so organic
   catches stay countable.
+- **Publication audit round** (fresh-eyes review findings, all fixed):
+  seam-ledger files + GT10 shipped so docs match the tree; private-incident
+  SHAs removed from docs; gate "planted stats" and foreign-suite markers are
+  now generic with operator-injectable env knobs (`CLAIM_GATE_STATS_EXTRA`,
+  `CLAIM_GATE_FOREIGN_EXTRA`); FEATURES no longer mislabels the
+  deterministic gate as an "LLM judge"; PyYAML prerequisite documented
+  (README + TROUBLESHOOTING); bash-3.2 array-subscript fix in uninstall;
+  duplicate README doc sections merged; doc counts and timing claims
+  corrected; toggle rejects flag-first argument order with a helpful
+  message; `scripts/sync-from-kernel.sh` added for deterministic kernel→export
+  propagation (with kernel-freshness check).
 
-## [1] — 2026-08-31
+## v0.1.0 — 2026-08-31
 
 Initial public kernel: always-on claim gate (one-line Hermes patch + judge
 script), self-heal watchdog, toggle, doctor, GT suite, truth integration,

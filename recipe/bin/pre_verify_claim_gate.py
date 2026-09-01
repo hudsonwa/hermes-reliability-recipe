@@ -80,27 +80,31 @@ LINES_NEAR_PATH = re.compile(
 )
 
 
-
-PLANTED_FAKE_STATS = re.compile(
-    r"\b(485\s*lines|17,?571\s*bytes|6,?968\s*records|55\s+live\s+files|412\s*lines)\b",
-    re.I,
-)
+# Planted / canned "success theater" numbers. Base patterns are intentionally
+# generic (grouped-number stats). Add your own incident patterns via
+# CLAIM_GATE_STATS_EXTRA (comma-separated regex fragments). Built per call so
+# in-process users (tests) can set the env dynamically.
+def _stats_pattern() -> "re.Pattern[str]":
+    base = r"\b\d{1,3}(?:,\d{3})+\s+(?:bytes|records|files)\b"
+    extra = os.environ.get("CLAIM_GATE_STATS_EXTRA", "").strip()
+    parts = [p.strip() for p in extra.split(",") if p.strip()]
+    return re.compile(base + ("|" + "|".join(parts) if parts else ""), re.I)
 
 # Foreign suite markers: common wrong-tree / host-wide theater.
 # Extra patterns: CLAIM_GATE_FOREIGN_EXTRA (comma-separated regex fragments).
-_FOREIGN_BASE = (
-    r"151\s+passed"
-    r"|hermes/phase1"
-    r"|agentloop-hermes"
-    r"|/\.hermes/hermes-agent(?:/|$)"
-    r"|site-packages/.+/tests"
-)
-_extra = os.environ.get("CLAIM_GATE_FOREIGN_EXTRA", "").strip()
-if _extra:
-    parts = [p.strip() for p in _extra.split(",") if p.strip()]
+# Generic wrong-tree markers. Machine-specific incident markers belong in
+# CLAIM_GATE_FOREIGN_EXTRA (comma-separated regex fragments), not in the
+# shipped defaults — a fixed "151 passed" can misfire on innocent suites.
+def _foreign_pattern() -> "re.Pattern[str]":
+    base = (
+        r"/\.hermes/hermes-agent(?:/|$)"
+        r"|site-packages/.+/tests"
+    )
+    extra = os.environ.get("CLAIM_GATE_FOREIGN_EXTRA", "").strip()
+    parts = [p.strip() for p in extra.split(",") if p.strip()]
     if parts:
-        _FOREIGN_BASE = _FOREIGN_BASE + "|" + "|".join(parts)
-FOREIGN_SUITE = re.compile(rf"\b({_FOREIGN_BASE})\b", re.I)
+        base = base + "|" + "|".join(parts)
+    return re.compile(rf"\b({base})\b", re.I)
 
 # Finish-line "verified/done" without a named check + coverage (J-Space --by).
 VERIFIED_DONE_CLAIM = re.compile(
@@ -211,7 +215,7 @@ def _local_test_receipt(final: str, cwd: str) -> bool:
     if "EXPECT_FAIL" in final:
         return True
     # Foreign suite with big pass counts is NOT local
-    if FOREIGN_SUITE.search(final):
+    if _foreign_pattern().search(final):
         return False
     # Generic "N passed" without local anchor — not good enough when cwd known
     if re.search(r"\b\d+\s+passed\b", final, re.I) and not re.search(
@@ -230,7 +234,7 @@ def evaluate(final: str, attempt: int, changed_paths: list | None = None, cwd: s
     claims_tests_pass = bool(TESTS_PASS_CLAIM.search(final))
     has_success = bool(SUCCESS_PAT.search(final)) or claims_tests_pass
 
-    if honest and not claims_tests_pass and not PLANTED_FAKE_STATS.search(final):
+    if honest and not claims_tests_pass and not _stats_pattern().search(final):
         return {}
 
     if (
@@ -248,8 +252,8 @@ def evaluate(final: str, attempt: int, changed_paths: list | None = None, cwd: s
             return _force_partial_msg(reason)
         return _continue("CLAIM GATE: " + reason)
 
-    if not has_success and not PLANTED_FAKE_STATS.search(final) and not (
-        claims_tests_pass and FOREIGN_SUITE.search(final)
+    if not has_success and not _stats_pattern().search(final) and not (
+        claims_tests_pass and _foreign_pattern().search(final)
     ):
         return {}
 
@@ -316,7 +320,7 @@ def evaluate(final: str, attempt: int, changed_paths: list | None = None, cwd: s
             + ". Re-stat/read and correct numbers, or drop the claim."
         )
 
-    if PLANTED_FAKE_STATS.search(final) and not honest:
+    if _stats_pattern().search(final) and not honest:
         reason = (
             "Suspicious invented corpus/prior stats "
             "(485 lines / 17571 bytes / 6968 records / 55 files / 412 lines) "
@@ -331,7 +335,7 @@ def evaluate(final: str, attempt: int, changed_paths: list | None = None, cwd: s
         )
 
     # Wrong-tree / foreign suite greens
-    if claims_tests_pass and FOREIGN_SUITE.search(final) and not honest:
+    if claims_tests_pass and _foreign_pattern().search(final) and not honest:
         reason = (
             "Test success cites a foreign suite or host-wide pass count "
             f"(not clearly bound to workspace {cwd or 'current project'}). "
@@ -364,7 +368,7 @@ def evaluate(final: str, attempt: int, changed_paths: list | None = None, cwd: s
         clean_green = bool(
             re.search(r"\b\d+\s+passed\b", final, re.I)
             and not re.search(r"\b\d+\s+failed\b", final, re.I)
-            and not FOREIGN_SUITE.search(final)
+            and not _foreign_pattern().search(final)
             and local_anchor
         )
         if clean_green:

@@ -7,9 +7,14 @@ source "$ROOT/scripts/lib.sh"
 PY="$(resolve_python)"
 GATE="$ROOT/recipe/bin/pre_verify_claim_gate.py"
 TEST_GATE="$ROOT/recipe/bin/test_claim_gate.py"
+TEST_LEDGER="$ROOT/recipe/bin/test_seam_ledger.py"
 FAIL=0
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
+# GT2/GT5 invoke the gate directly; without this the gate's hits logger
+# defaults to $HERMES_HOME/logs/claim_gate_hits.jsonl and pollutes the LIVE
+# profile's organic-catch log with test rows (null session_id noise).
+export CLAIM_GATE_LOG="$TMP/gt-claim-gate-hits.jsonl"
 
 echo "== GT1 claim gate unit tests =="
 if [[ -f "$TEST_GATE" ]]; then
@@ -20,6 +25,17 @@ if [[ -f "$TEST_GATE" ]]; then
   fi
 else
   echo "FAIL GT1 missing $TEST_GATE"; FAIL=1
+fi
+
+echo "== GT1b seam ledger unit tests =="
+if [[ -f "$TEST_LEDGER" ]]; then
+  if ! "$PY" "$TEST_LEDGER"; then
+    echo "FAIL GT1b"; FAIL=1
+  else
+    echo "PASS GT1b"
+  fi
+else
+  echo "FAIL GT1b missing $TEST_LEDGER"; FAIL=1
 fi
 
 echo "== GT2 loud banner on ungrounded ship =="
@@ -172,6 +188,40 @@ if [[ "$GT9_FAIL" -eq 0 ]]; then
   echo "PASS GT9 off→on restores soft working-style"
 else
   FAIL=1
+fi
+
+echo "== GT10 selfheal detects Hermes pre_verify patch drift =="
+# Hermetic: fake Hermes root whose conversation_loop.py is edit-gated must
+# produce pre_verify_patch_drift; always-on must stay clean.
+if [[ -n "$PROFILE_FOR_GT" && -f "$HOME/.hermes/profiles/$PROFILE_FOR_GT/config.yaml" ]]; then
+  GT10_ROOT="$TMP/gt10-hermes-root"
+  mkdir -p "$GT10_ROOT/agent"
+  cat >"$GT10_ROOT/agent/conversation_loop.py" <<'LOOP'
+def x():
+    if _edited and has_hook("pre_verify") and _attempt < max_verify_nudges():
+        pass
+LOOP
+  GT10_OUT=$(HERMES_AGENT_ROOT="$GT10_ROOT" HRR_TEST_PROFILE="${PROFILE_FOR_GT:-}" \
+    bash "$ROOT/scripts/reliability-selfheal.sh" --profile "$PROFILE_FOR_GT" --check-only 2>&1 || true)
+  if echo "$GT10_OUT" | grep -q "pre_verify_patch_drift"; then
+    echo "PASS GT10a drift flagged on edit-gated root"
+  else
+    echo "FAIL GT10a drift not flagged"; echo "$GT10_OUT"; FAIL=1
+  fi
+  cat >"$GT10_ROOT/agent/conversation_loop.py" <<'LOOP2'
+def x():
+    if has_hook("pre_verify") and _attempt < max_verify_nudges():
+        pass
+LOOP2
+  GT10_OUT2=$(HERMES_AGENT_ROOT="$GT10_ROOT" HRR_TEST_PROFILE="${PROFILE_FOR_GT:-}" \
+    bash "$ROOT/scripts/reliability-selfheal.sh" --profile "$PROFILE_FOR_GT" --check-only 2>&1 || true)
+  if echo "$GT10_OUT2" | grep -q "pre_verify_patch_drift"; then
+    echo "FAIL GT10b false positive on always-on root"; echo "$GT10_OUT2"; FAIL=1
+  else
+    echo "PASS GT10b no false positive on always-on root"
+  fi
+else
+  echo "SKIP GT10 (set HRR_TEST_PROFILE to a real profile for live check)"
 fi
 
 if [[ "$FAIL" -ne 0 ]]; then

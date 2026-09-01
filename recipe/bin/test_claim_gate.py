@@ -85,6 +85,28 @@ def test_hook_stdin():
     assert out.get("action") == "continue"
 
 
+def test_verified_done_without_coverage_blocked():
+    """Finish-line 'verified/done' with no named check + coverage must block."""
+    final = "Verified the fix. The task is done."
+    out = evaluate(final, 0, cwd="/tmp/proj")
+    assert out.get("action") == "continue", out
+    msg = out.get("message", "").lower()
+    assert "coverage" in msg, out
+
+
+def test_verified_done_with_coverage_allowed():
+    final = (
+        "Verified the fix by pytest -q (3 passed). "
+        "Coverage: unit tests in this cwd, not Telegram."
+    )
+    assert evaluate(final, 0, cwd="/tmp/proj") == {}
+
+
+def test_planning_verify_prose_untouched():
+    final = "Next we should verify the tests after the refactor."
+    assert evaluate(final, 0, cwd="/tmp/proj") == {}
+
+
 def main() -> int:
     tests = [
         test_smoking_gun_blocked,
@@ -95,6 +117,9 @@ def main() -> int:
         test_green_no_receipt_blocked,
         test_honest_fail_allowed,
         test_hook_stdin,
+        test_verified_done_without_coverage_blocked,
+        test_verified_done_with_coverage_allowed,
+        test_planning_verify_prose_untouched,
     ]
     failed = 0
     for t in tests:

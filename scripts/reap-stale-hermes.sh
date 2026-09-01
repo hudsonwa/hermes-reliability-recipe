@@ -15,14 +15,13 @@
 #   gateway run | hermes serve | dashboard | open-webui | Hermes.app | truth-mcp with live parent
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=lib.sh
-source "$SCRIPT_DIR/lib.sh"
-
 APPLY=0
 MAX_AGE_MIN="${REAP_MAX_AGE_MIN:-120}"
 REGISTRY_ONLY=0
 PROFILE="${HERMES_PROFILE:-}"
+HOME_P="${HERMES_HOME:-$HOME/.hermes/profiles/$PROFILE}"
+REG="${WORKER_REGISTRY:-$HOME_P/state/worker_pids.jsonl}"
+LOG="${REAP_LOG:-$HOME_P/logs/process_reaper.jsonl}"
 NOW=$(date +%s)
 
 while [[ $# -gt 0 ]]; do
@@ -40,8 +39,7 @@ if [[ -z "$PROFILE" ]]; then
   echo "required: --profile NAME" >&2
   exit 2
 fi
-validate_profile_name "$PROFILE" || exit 2
-HOME_P="$(profile_home "$PROFILE")"
+HOME_P="$HOME/.hermes/profiles/$PROFILE"
 REG="${WORKER_REGISTRY:-$HOME_P/state/worker_pids.jsonl}"
 LOG="${REAP_LOG:-$HOME_P/logs/process_reaper.jsonl}"
 
@@ -52,10 +50,7 @@ SKIPPED=()
 REPORT=()
 
 log_line() {
-  # $1=action $2=pid $3=age $4=optional out
-  REAP_ACTION="$1" REAP_PID="$2" REAP_AGE="$3" REAP_OUT="${4:-}" REAP_TS="$NOW" \
-    python3 -c 'import json,os,sys
-print(json.dumps({"ts":int(os.environ["REAP_TS"]),"action":os.environ["REAP_ACTION"],"pid":int(os.environ["REAP_PID"]),"age_s":int(os.environ["REAP_AGE"]),"out":os.environ.get("REAP_OUT","")}))' >> "$LOG"
+  echo "$1" >> "$LOG"
 }
 
 is_never_kill() {
@@ -111,7 +106,7 @@ if [[ -f "$REG" ]]; then
         sleep 0.2
         kill -9 "$pid" 2>/dev/null || true
         KILLED+=("$pid")
-        log_line "kill_registry" "$pid" "$age" "$out"
+        log_line "{\"ts\":$NOW,\"action\":\"kill_registry\",\"pid\":$pid,\"age_s\":$age,\"out\":\"$out\"}"
       fi
       # do not keep entry
     else
@@ -151,7 +146,7 @@ if [[ "$REGISTRY_ONLY" != "1" ]]; then
         sleep 0.2
         kill -9 "$pid" 2>/dev/null || true
         KILLED+=("$pid")
-        log_line "kill_orphan_chat" "$pid" "$age"
+        log_line "{\"ts\":$NOW,\"action\":\"kill_orphan_chat\",\"pid\":$pid,\"age_s\":$age}"
       fi
     fi
   done < <(ps -axo pid=,ppid=,etime=,command= | grep -i hermes | grep -v grep || true)

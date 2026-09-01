@@ -211,6 +211,18 @@ Never commit real `.env` files, chat exports, or personal notes.
 - [LONG_LOOPS.md](docs/LONG_LOOPS.md) · [UPSTREAM_SYNC.md](docs/UPSTREAM_SYNC.md)
 - [GITHUB_PUBLISH.md](docs/GITHUB_PUBLISH.md) — how this tree is released
 
+### Documentation
+
+- [docs/FEATURES.md](docs/FEATURES.md) — the full feature list (what each
+  piece does, where it lives, which test covers it)
+- [docs/WHY-2026-09-01.md](docs/WHY-2026-09-01.md) — the incident-driven
+  rationale for the latest round of improvements (anonymized, with the A/B
+  evidence)
+- [docs/SELF-HEAL.md](docs/SELF-HEAL.md) / [docs/DOCTOR.md](docs/DOCTOR.md) —
+  watchdog + post-update verification
+- [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) — failure modes this recipe
+  defends against
+
 ### License
 
 MIT for this repository. `truth` is MIT upstream (downloaded at install). Hermes Agent: Nous Research terms.

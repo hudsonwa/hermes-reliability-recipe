@@ -80,6 +80,7 @@ LINES_NEAR_PATH = re.compile(
 )
 
 
+
 PLANTED_FAKE_STATS = re.compile(
     r"\b(485\s*lines|17,?571\s*bytes|6,?968\s*records|55\s+live\s+files|412\s*lines)\b",
     re.I,
@@ -100,6 +101,22 @@ if _extra:
     if parts:
         _FOREIGN_BASE = _FOREIGN_BASE + "|" + "|".join(parts)
 FOREIGN_SUITE = re.compile(rf"\b({_FOREIGN_BASE})\b", re.I)
+
+# Finish-line "verified/done" without a named check + coverage (J-Space --by).
+VERIFIED_DONE_CLAIM = re.compile(
+    r"\b("
+    r"verified the\b"
+    r"|the task is done\b"
+    r"|task is complete\b"
+    r")",
+    re.I,
+)
+COVERAGE_CLAUSE = re.compile(
+    r"\b(coverage|covers\b|covered by|verified by)\b"
+    r"|pytest"
+    r"|exit[_ ]?code",
+    re.I,
+)
 
 MAX_ATTEMPT_SOFT = 2
 MAX_ATTEMPT_HARD = 3
@@ -215,6 +232,21 @@ def evaluate(final: str, attempt: int, changed_paths: list | None = None, cwd: s
 
     if honest and not claims_tests_pass and not PLANTED_FAKE_STATS.search(final):
         return {}
+
+    if (
+        VERIFIED_DONE_CLAIM.search(final)
+        and not COVERAGE_CLAUSE.search(final)
+        and not claims_tests_pass
+    ):
+        reason = (
+            "verified/done claimed without coverage: name the check and what it covered "
+            "(command + scope), or say FAILED/PARTIAL."
+        )
+        if attempt >= MAX_ATTEMPT_HARD:
+            return {}
+        if attempt >= MAX_ATTEMPT_SOFT:
+            return _force_partial_msg(reason)
+        return _continue("CLAIM GATE: " + reason)
 
     if not has_success and not PLANTED_FAKE_STATS.search(final) and not (
         claims_tests_pass and FOREIGN_SUITE.search(final)

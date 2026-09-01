@@ -2,10 +2,18 @@
 # Config-parity check: compare reliability settings across local profiles.
 # Flags drift in the settings whose silent changes broke this stack before
 # (verify_on_stop clobber, enforcement flips, hook removal). Silent = parity.
-# Usage: bash config-parity-check.sh            (mini default: valentine randolph)
-#        PARITY_PROFILES="exmachina" bash config-parity-check.sh   (MBP)
+# Usage: bash config-parity-check.sh   (auto-discovers managed profiles; or PARITY_PROFILES="a b")
 set -u
-PROFILES="${PARITY_PROFILES:-valentine randolph}"
+# Auto-discover managed profiles: ones actually running this stack (their
+# own self-heal log / heartbeat present). Copies of the gate binary alone
+# don't count — unmanaged profiles may legitimately differ.
+PROFILES="${PARITY_PROFILES:-}"
+if [ -z "$PROFILES" ]; then
+  PROFILES=$(for f in "$HOME"/.hermes/profiles/*/logs/reliability_selfheal.jsonl \
+                  "$HOME"/.hermes/profiles/*/state/reliability-heartbeat.txt; do
+    [ -f "$f" ] && basename "$(dirname "$(dirname "$f")")"
+  done | sort -u)
+fi
 HERMES_ROOT="${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}"
 PY="$HERMES_ROOT/venv/bin/python"
 [ -x "$PY" ] || PY=python3

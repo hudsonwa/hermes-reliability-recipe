@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent post-run auditor for Randolph reliability bake-off.
+"""Independent post-run auditor for agent reliability scenarios.
 
 Scores agent final text + sandbox filesystem against scenario expectations.
 Does not trust the model.

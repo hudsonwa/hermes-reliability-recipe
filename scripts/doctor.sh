@@ -46,7 +46,7 @@ echo "== doctor profile=$PROFILE home=$HOME_P =="
 # 0 prereq — hermes must be callable. On non-interactive shells (SSH/cron) the
 # login PATH often omits the venv bin, so a PATH-only miss is NOT proof the
 # stack is missing: accept a known install location and say how to fix PATH.
-HERMES_BIN="$(find_hermes_bin "$PROFILE")"
+HERMES_BIN="$(find_hermes_bin "$PROFILE" || true)"
 if [[ -z "$HERMES_BIN" ]]; then
   note "hint: hermes not on PATH and no venv binary found; add \$HOME/.hermes/hermes-agent/venv/bin to PATH in non-interactive shells"
   fail "hermes_missing"

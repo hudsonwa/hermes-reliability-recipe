@@ -271,6 +271,13 @@ GT11_HERMES=$(PATH=/usr/bin:/bin HERMES_AGENT_ROOT="$GT11_AGENT" find_hermes_bin
 if [[ "$GT11_HERMES" != "$GT11_AGENT/venv/bin/hermes" ]]; then
   echo "FAIL GT11 hermes fallback (got: ${GT11_HERMES:-none})"; GT11_FAIL=1
 fi
+# Absent-hermes case: must return EMPTY (and not trip callers using set -e).
+# HOME is pointed at an empty fake home so ~/.local/bin/hermes cannot match.
+mkdir -p "$TMP/gt11-empty" "$TMP/gt11-empty-home"
+GT11_NONE=$(PATH=/usr/bin:/bin HOME="$TMP/gt11-empty-home" HERMES_AGENT_ROOT="$TMP/gt11-empty" find_hermes_bin gt11 2>/dev/null || true)
+if [[ -n "$GT11_NONE" ]]; then
+  echo "FAIL GT11 hermes should be absent (got: $GT11_NONE)"; GT11_FAIL=1
+fi
 
 # doctor output must NAME the failing state (acceptance), not conflate.
 GT11_PF="$TMP/gt11-profiles/gt11w"

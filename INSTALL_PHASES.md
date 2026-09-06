@@ -68,7 +68,14 @@ printf 'phase=01-truth\nstatus=PASS\nts=%s\n' "$(date -Iseconds)" > .truth-stamp
 
 ./scripts/install.sh --profile PROFILE
 test -f "$HOME/.hermes/profiles/PROFILE/bin/pre_verify_claim_gate.py"
+test -f "$HOME/.hermes/profiles/PROFILE/working-style-instruction.md"
 ```
+
+The working-style file is **required, not optional**: install creates it from
+the template when missing, or appends the reliability soft block when the
+profile already has one. Doctor reports a missing or incomplete file as its own
+code (`working_style_missing`, `working_style_marker_missing`,
+`working_style_lie_truth_run_missing`) — see docs/DOCTOR.md.
 
 Expect: `PASS install --profile PROFILE`  
 Stamp: install.sh writes `02-files.PASS`.

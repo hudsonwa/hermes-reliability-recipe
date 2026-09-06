@@ -25,16 +25,41 @@ One command replaces “I think it’s installed.” Failures name the missing p
 
 ## What it checks
 
-1. **Hermes on PATH**
+1. **Hermes on PATH** (falls back to known venv install locations in non-interactive shells)
 2. **PyYAML** (via resolved Python — Hermes venv / python3 / python3.11 / …)
 3. **Recipe claim gate** present
 4. **Gate unit tests** (11 unit tests + 5 seam-ledger tests)
 5. **Truth binary** — present **and runnable** (not just `chmod +x`)
 6. **Truth-mcp binary** present
-7. **Profile stack** — `pre_verify` hook, `verify_on_stop`, truth MCP (unless `--allow-no-truth`), coding_instructions, state, gate in profile bin, working-style soft block (marker + `LIE/HALLUCINATION` + `truth_run_wrap`)
+7. **Profile stack** — `pre_verify` hook, `verify_on_stop`, truth MCP (unless `--allow-no-truth`), coding_instructions, state, gate in profile bin
 8. **Always-on pre_verify** in Hermes source (unless `--skip-patch`)
 9. **Recipe template** hazard lines
-10. **Profile working-style soft block** live file
+10. **Profile working-style soft block** — one of three failure codes (see below)
+
+## Working-style soft block codes
+
+The soft block (marker + `LIE/HALLUCINATION` + `truth_run_wrap` lines) is checked in three distinct states, so a failure names the actual missing piece:
+
+- `working_style_missing` — no `working-style-instruction.md` in the profile at all. Fix: `./scripts/install.sh --profile NAME` (or `./scripts/reliability-toggle.sh on --profile NAME`).
+- `working_style_marker_missing` — the file exists but lacks the `# Reliability stack (hermes-reliability-recipe)` marker. A clone can ship the LIE/truth_run lines without the marker; doctor still names the marker miss. Fix: `./scripts/reliability-toggle.sh on --profile NAME` appends the soft block (existing content is kept).
+- `working_style_lie_truth_run_missing` — the marker is present but the LIE/truth_run lines are missing. Fix: re-run `toggle on`, or restore from the `.bak` backup.
+
+The working-style file is **required**, not optional; install and toggle create/restore it.
+
+## Non-interactive shells (SSH, cron, CI)
+
+A login shell usually puts the Hermes venv on PATH; an SSH command, cron job, or CI step does not. Doctor still passes the hermes prereq in that case by falling back to the known install locations (honoring `HERMES_AGENT_ROOT` and `HERMES_PROFILES_ROOT`):
+
+1. `$HERMES_AGENT_ROOT/venv/bin/hermes` (default `~/.hermes/hermes-agent/venv/bin/hermes`)
+2. `<profile home>/hermes-agent/venv/bin/hermes`
+3. `~/.local/bin/hermes`, `~/bin/hermes`
+
+It prints the found binary and the PATH line to add; only when none exists does doctor fail `hermes_missing`. To remove the fallback entirely, invoke doctor with the venv on PATH:
+
+```bash
+export PATH="$HOME/.hermes/hermes-agent/venv/bin:$PATH"
+./scripts/doctor.sh --profile YOUR_PROFILE
+```
 
 ## Tradeoffs
 

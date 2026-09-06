@@ -129,6 +129,8 @@ hermes profile create myagent   # skip if it already exists
 ./scripts/doctor.sh --profile myagent             # PASS = actually installed
 ```
 
+`install.sh` also ensures the profile has a `working-style-instruction.md` (created from the template when missing, or the reliability soft block appended to an existing file). It is required, not optional: doctor names a missing or incomplete one separately as `working_style_missing`, `working_style_marker_missing`, or `working_style_lie_truth_run_missing` (details in [docs/DOCTOR.md](docs/DOCTOR.md)). Under non-interactive shells (SSH/cron) doctor also accepts the Hermes venv binary when `hermes` is not on PATH.
+
 Then **you** fill `~/.hermes/profiles/myagent/.env` if you use APIs, and start a **new** Hermes session (or restart your gateway) so the hook loads. Mid-chat config edits do nothing.
 
 Old Linux / no receipts:

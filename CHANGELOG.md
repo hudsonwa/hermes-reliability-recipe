@@ -2,6 +2,19 @@
 
 All notable changes to the reliability recipe. Dates are UTC.
 
+## v0.2.1 — 2026-09-07
+
+### Fixed
+- **Doctor hermes prereq** no longer fails a PATH-only miss: under
+  non-interactive shells (SSH/cron) doctor accepts the venv binary at the known
+  install locations and prints how to add it to PATH. (#1)
+- **Doctor working-style check** now names which piece is missing instead of
+  one conflated soft-missing code: `working_style_missing`,
+  `working_style_marker_missing` (a clone can ship the LIE/truth_run lines
+  without the marker), or `working_style_lie_truth_run_missing`. (#2)
+- **Docs**: non-interactive-shell guidance added to `docs/DOCTOR.md`; the
+  working-style file is now listed as required in the Phase 2 checklist.
+
 ## v0.2.0 — 2026-09-01
 
 The hardening pass after a real production incident (three simultaneous

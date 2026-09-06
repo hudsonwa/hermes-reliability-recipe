@@ -105,8 +105,11 @@ if not (home / "working-style-instruction.md").exists():
 else:
     ws = (home / "working-style-instruction.md").read_text(errors="replace")
     marker = "# Reliability stack (hermes-reliability-recipe)"
-    if marker not in ws or "LIE/HALLUCINATION" not in ws or "truth_run_wrap" not in ws.lower():
-        issues.append("working_style_soft_missing")
+    # Same three-state naming as doctor.sh: file / marker / LIE+truth_run.
+    if marker not in ws:
+        issues.append("working_style_marker_missing")
+    elif "LIE/HALLUCINATION" not in ws or "truth_run_wrap" not in ws.lower():
+        issues.append("working_style_lie_truth_run_missing")
 
 # Hermes patch-drift check: an update restores the edit-gated pre_verify
 # condition, silently degrading the gate to edit-turns-only. Diagnose it so

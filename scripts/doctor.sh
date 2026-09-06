@@ -43,8 +43,19 @@ ok() { note "ok: $1"; }
 
 echo "== doctor profile=$PROFILE home=$HOME_P =="
 
-# 0 prereq
-if command -v hermes >/dev/null 2>&1; then ok "hermes on PATH"; else fail "hermes_missing"; fi
+# 0 prereq — hermes must be callable. On non-interactive shells (SSH/cron) the
+# login PATH often omits the venv bin, so a PATH-only miss is NOT proof the
+# stack is missing: accept a known install location and say how to fix PATH.
+HERMES_BIN="$(find_hermes_bin "$PROFILE")"
+if [[ -z "$HERMES_BIN" ]]; then
+  note "hint: hermes not on PATH and no venv binary found; add \$HOME/.hermes/hermes-agent/venv/bin to PATH in non-interactive shells"
+  fail "hermes_missing"
+elif command -v hermes >/dev/null 2>&1; then
+  ok "hermes on PATH"
+else
+  ok "hermes at $HERMES_BIN (venv fallback, not on PATH)"
+  note "hint: add $(dirname "$HERMES_BIN") to PATH for non-interactive shells: export PATH=\"$(dirname "$HERMES_BIN"):\$PATH\""
+fi
 if "$PY" -c 'import yaml' 2>/dev/null; then ok "PyYAML ($PY)"; else fail "pyyaml_missing"; fi
 
 # gate + tests in recipe
@@ -134,13 +145,6 @@ else:
     issues.append("state_missing")
 if not (home / "bin" / "pre_verify_claim_gate.py").exists():
     issues.append("profile_gate_missing")
-if not (home / "working-style-instruction.md").exists():
-    issues.append("working_style_missing")
-else:
-    ws = (home / "working-style-instruction.md").read_text(errors="replace")
-    marker = "# Reliability stack (hermes-reliability-recipe)"
-    if marker not in ws or "LIE/HALLUCINATION" not in ws or "truth_run_wrap" not in ws.lower():
-        issues.append("working_style_soft_missing")
 print(json.dumps(issues))
 PY
 )
@@ -191,12 +195,20 @@ else
   fail "working_style_hazards"
 fi
 
-# working-style soft block — profile (live soft layer; catches toggle off→on drop)
-if profile_has_ws_soft_block "$HOME_P"; then
-  ok "profile working-style soft block (LIE + truth_run)"
-else
-  fail "profile_working_style_soft_missing"
-fi
+# working-style soft block — profile (live soft layer; catches toggle off→on drop).
+# Distinct failure codes: missing file vs missing marker vs missing LIE/truth_run.
+case "$(ws_soft_block_state "$HOME_P/working-style-instruction.md")" in
+  ok) ok "profile working-style soft block (LIE + truth_run)" ;;
+  missing)
+    note "hint: no working-style-instruction.md in profile; run install.sh or toggle on to create it"
+    fail "working_style_missing" ;;
+  marker_missing)
+    note "hint: file exists but lacks the reliability marker; run ./scripts/reliability-toggle.sh on --profile $PROFILE to append the soft block (existing LIE/truth_run lines are kept)"
+    fail "working_style_marker_missing" ;;
+  lie_truth_run_missing)
+    note "hint: marker present but LIE/truth_run lines missing; run ./scripts/reliability-toggle.sh on --profile $PROFILE to rebuild the soft block"
+    fail "working_style_lie_truth_run_missing" ;;
+esac
 
 if [[ "$FAIL" -ne 0 ]]; then
   echo "DOCTOR FAIL profile=$PROFILE issues=${ISSUES[*]}"

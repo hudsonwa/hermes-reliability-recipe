@@ -151,6 +151,50 @@ ws_soft_marker() {
   echo "# Reliability stack (hermes-reliability-recipe)"
 }
 
+# Classify the reliability soft block in a working-style file.
+# Prints one of: missing | marker_missing | lie_truth_run_missing | ok
+# Doctor uses this so a failure names WHICH piece is absent: a clone can carry
+# the LIE/truth_run lines without the marker, or the marker without the lines.
+ws_soft_block_state() {
+  local ws="$1"
+  local marker
+  marker="$(ws_soft_marker)"
+  if [[ ! -f "$ws" ]]; then
+    echo "missing"
+    return 0
+  fi
+  grep -qF "$marker" "$ws" 2>/dev/null || { echo "marker_missing"; return 0; }
+  if ! grep -q 'LIE/HALLUCINATION' "$ws" 2>/dev/null \
+    || ! grep -qi 'truth_run_wrap' "$ws" 2>/dev/null; then
+    echo "lie_truth_run_missing"
+    return 0
+  fi
+  echo "ok"
+}
+
+# Locate a runnable hermes binary: PATH first, then known install locations.
+# Non-interactive shells (SSH, cron) often omit the venv bin from PATH, so a
+# PATH-only miss is NOT proof the stack is missing. Prints the path or nothing.
+find_hermes_bin() {
+  local profile="$1"
+  local cand
+  if command -v hermes >/dev/null 2>&1; then
+    command -v hermes
+    return 0
+  fi
+  for cand in \
+    "${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}/venv/bin/hermes" \
+    "${HERMES_PROFILES_ROOT:-$HOME/.hermes/profiles}/$profile/hermes-agent/venv/bin/hermes" \
+    "$HOME/.local/bin/hermes" \
+    "$HOME/bin/hermes"; do
+    if [[ -x "$cand" ]]; then
+      echo "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
 # True if profile working-style carries the soft LIE / truth_run block.
 # Usage: profile_has_ws_soft_block <profile_home>
 profile_has_ws_soft_block() {

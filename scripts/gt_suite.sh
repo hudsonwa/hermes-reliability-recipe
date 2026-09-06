@@ -224,6 +224,76 @@ else
   echo "SKIP GT10 (set HRR_TEST_PROFILE to a real profile for live check)"
 fi
 
+echo "== GT11 doctor WS three-state + hermes venv fallback =="
+# Locks issue #1/#2: a PATH-only hermes miss must not fail doctor, and the
+# working-style check must name WHICH piece is missing (file / marker / content).
+GT11_FAIL=0
+GT11_WS="$TMP/gt11-ws.md"
+
+# 1) no file -> missing
+rm -f "$GT11_WS"
+if [[ "$(ws_soft_block_state "$GT11_WS")" != "missing" ]]; then
+  echo "FAIL GT11 state=missing (no file)"; GT11_FAIL=1
+fi
+# 2) plain style file -> marker_missing
+printf '# My style\nplain text\n' >"$GT11_WS"
+if [[ "$(ws_soft_block_state "$GT11_WS")" != "marker_missing" ]]; then
+  echo "FAIL GT11 state=marker_missing (plain file)"; GT11_FAIL=1
+fi
+# 3) clone-from-randolph: LIE/truth_run lines present but NO marker -> still
+#    marker_missing, so the marker miss is not hidden by existing content.
+printf '# My style\n>>> LIE/HALLUCINATION CAUGHT... <<<\nUse truth_run_wrap for pytest.\n' >>"$GT11_WS"
+if [[ "$(ws_soft_block_state "$GT11_WS")" != "marker_missing" ]]; then
+  echo "FAIL GT11 state=marker_missing (LIE present, no marker)"; GT11_FAIL=1
+fi
+# 4) marker present, content missing -> lie_truth_run_missing
+printf '# Reliability stack (hermes-reliability-recipe)\n---\n' >"$GT11_WS"
+if [[ "$(ws_soft_block_state "$GT11_WS")" != "lie_truth_run_missing" ]]; then
+  echo "FAIL GT11 state=lie_truth_run_missing (marker only)"; GT11_FAIL=1
+fi
+# 5) real soft block (marker + --- + template) -> ok
+{
+  echo "# Reliability stack (hermes-reliability-recipe)"
+  echo "---"
+  cat "$ROOT/recipe/templates/working-style-instruction.md"
+} >"$GT11_WS"
+if [[ "$(ws_soft_block_state "$GT11_WS")" != "ok" ]]; then
+  echo "FAIL GT11 state=ok (full soft block)"
+  echo "  got: $(ws_soft_block_state "$GT11_WS")"; GT11_FAIL=1
+fi
+
+# hermes venv fallback: PATH-only miss must resolve via HERMES_AGENT_ROOT.
+GT11_AGENT="$TMP/gt11-agent"
+mkdir -p "$GT11_AGENT/venv/bin"
+printf '#!/bin/sh\necho fake-hermes\n' >"$GT11_AGENT/venv/bin/hermes"
+chmod +x "$GT11_AGENT/venv/bin/hermes"
+GT11_HERMES=$(PATH=/usr/bin:/bin HERMES_AGENT_ROOT="$GT11_AGENT" find_hermes_bin gt11 2>/dev/null || true)
+if [[ "$GT11_HERMES" != "$GT11_AGENT/venv/bin/hermes" ]]; then
+  echo "FAIL GT11 hermes fallback (got: ${GT11_HERMES:-none})"; GT11_FAIL=1
+fi
+
+# doctor output must NAME the failing state (acceptance), not conflate.
+GT11_PF="$TMP/gt11-profiles/gt11w"
+mkdir -p "$GT11_PF"
+echo "agent: {}" >"$GT11_PF/config.yaml"
+printf '# My style\n>>> LIE/HALLUCINATION CAUGHT... <<<\nUse truth_run_wrap for pytest.\n' >"$GT11_PF/working-style-instruction.md"
+GT11_OUT=$(HERMES_PROFILES_ROOT="$TMP/gt11-profiles" \
+  bash "$ROOT/scripts/doctor.sh" --profile gt11w --skip-patch 2>&1 || true)
+if ! echo "$GT11_OUT" | grep -q "working_style_marker_missing"; then
+  echo "FAIL GT11b doctor does not name working_style_marker_missing"
+  echo "$GT11_OUT" | grep -i "working" | head -3; GT11_FAIL=1
+fi
+if echo "$GT11_OUT" | grep -q "working_style_lie_truth_run_missing"; then
+  echo "FAIL GT11b doctor wrongly reports lie/truth_run missing (content exists)"
+  GT11_FAIL=1
+fi
+
+if [[ "$GT11_FAIL" -eq 0 ]]; then
+  echo "PASS GT11"
+else
+  FAIL=1
+fi
+
 if [[ "$FAIL" -ne 0 ]]; then
   echo "GT SUITE FAILED"
   exit 1

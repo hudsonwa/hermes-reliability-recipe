@@ -17,7 +17,7 @@ that used to slip through.
   hook in the profile config)
 - Patch: `patches/hermes/` via `scripts/apply-hermes-preverify-patch.sh`
 - Evidence: `logs/claim_gate_hits.jsonl` (session-attributed)
-- Tests: `recipe/bin/test_claim_gate.py` (11 cases, incl. the finish-line rule)
+- Tests: `recipe/bin/test_claim_gate.py` (14 cases, incl. the finish-line rule and quoted-stamp PASS)
 
 ## 2. Mid-loop verification nudges (`verify_on_stop`)
 

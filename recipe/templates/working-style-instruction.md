@@ -35,4 +35,4 @@ Simplest fix. Assessment-only requests stop at assessment. No drive-by refactors
 # Persist
 Update plan.md, log.md (timestamped), lessons.md after meaningful decisions/fixes. MEMORY.md = scratch index.
 # Reliability stack
-Use truth_run_wrap for pytest when available; mcp__truth__verify_turn before green/ship if available. Claim gate is hard stop — never bypass with prose.
+Use truth_run_wrap for pytest when available, wrapping a python that can import pytest (prefer $HERMES_VENV/python). Recipe gate suite is python recipe/bin/test_claim_gate.py — not pytest, not unittest. mcp__truth__verify_turn before green/ship if available. Claim gate is hard stop — never bypass with prose.

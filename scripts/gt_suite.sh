@@ -421,6 +421,102 @@ else
   FAIL=1
 fi
 
+echo "== GT15 venv python for pytest; recipe suite is not pytest (#6) =="
+GT15_FAIL=0
+# skills / template / toggle: wrap a python that can import pytest; name the gate suite
+for f in \
+  "$ROOT/recipe/skills/reliability/SKILL.md" \
+  "$ROOT/recipe/skills/reliability/truth-pytest-receipts/SKILL.md"
+do
+  if ! grep -q 'HERMES_VENV\|import pytest' "$f"; then
+    echo "FAIL GT15 $f missing HERMES_VENV or import pytest"
+    GT15_FAIL=1
+  fi
+  if ! grep -q 'recipe/bin/test_claim_gate.py' "$f"; then
+    echo "FAIL GT15 $f missing canonical gate suite path"
+    GT15_FAIL=1
+  fi
+  if grep -q 'truth_run_wrap.sh -- python3 -m pytest' "$f" \
+     || grep -q 'truth run -- python3 -m pytest' "$f"; then
+    echo "FAIL GT15 $f still wraps system python3 -m pytest"
+    GT15_FAIL=1
+  fi
+done
+if ! grep -q 'test_claim_gate.py' "$ROOT/recipe/templates/working-style-instruction.md"; then
+  echo "FAIL GT15 working-style missing gate suite path"
+  GT15_FAIL=1
+fi
+if grep -q 'python3 -m pytest' "$ROOT/scripts/reliability-toggle.sh"; then
+  echo "FAIL GT15 toggle still embeds python3 -m pytest in coding_instructions"
+  GT15_FAIL=1
+fi
+if ! grep -q 'HERMES_VENV' "$ROOT/scripts/reliability-toggle.sh"; then
+  echo "FAIL GT15 toggle coding_instructions missing HERMES_VENV"
+  GT15_FAIL=1
+fi
+
+# doctor: python3 -m pytest in coding_instructions + python3 cannot import pytest → FAIL
+GT15_ROOT="$TMP/gt15-profiles"
+GT15_NAME="gt15p"
+GT15_BIN="$TMP/gt15-bin"
+mkdir -p "$GT15_ROOT/$GT15_NAME/bin" "$GT15_BIN"
+cp -f "$ROOT/recipe/bin/pre_verify_claim_gate.py" "$GT15_ROOT/$GT15_NAME/bin/"
+cp -f "$ROOT/recipe/bin/test_claim_gate.py" "$GT15_ROOT/$GT15_NAME/bin/"
+printf '%s\n' '#!/bin/sh
+if [ "$1" = "-c" ] && echo "$2" | grep -q pytest; then exit 1; fi
+exit 0
+' >"$GT15_BIN/python3"
+chmod +x "$GT15_BIN/python3"
+cat >"$GT15_ROOT/$GT15_NAME/config.yaml" <<'YAML'
+agent:
+  coding_instructions: |
+    For tests in a project: wrap -- python3 -m pytest -q
+YAML
+GT15_OUT=$(PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT15_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if ! echo "$GT15_OUT" | grep -q "pytest_python_cannot_import"; then
+  echo "FAIL GT15a doctor did not fail pytest_python_cannot_import"
+  echo "$GT15_OUT"
+  GT15_FAIL=1
+fi
+# no pytest instruction → WARN only, not that fail code
+cat >"$GT15_ROOT/$GT15_NAME/config.yaml" <<'YAML'
+agent:
+  coding_instructions: |
+    Proof-before-claim. Quote tool output.
+YAML
+GT15_OUT2=$(PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT15_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT15_OUT2" | grep -q "pytest_python_cannot_import"; then
+  echo "FAIL GT15b no-pytest instruction still failed pytest_python_cannot_import"
+  echo "$GT15_OUT2"
+  GT15_FAIL=1
+fi
+if ! echo "$GT15_OUT2" | grep -qi "WARN.*pytest"; then
+  echo "FAIL GT15b expected WARN when coding_instructions have no pytest"
+  echo "$GT15_OUT2"
+  GT15_FAIL=1
+fi
+# venv/import-ok instructions → skip even if python3 cannot import pytest
+cat >"$GT15_ROOT/$GT15_NAME/config.yaml" <<'YAML'
+agent:
+  coding_instructions: |
+    For pytest: wrap -- "$HERMES_VENV/python" -m pytest -q
+    (a python where import pytest succeeds).
+YAML
+GT15_OUT3=$(PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT15_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT15_OUT3" | grep -q "pytest_python_cannot_import"; then
+  echo "FAIL GT15c venv/import-ok instructions still failed pytest_python_cannot_import"
+  echo "$GT15_OUT3"
+  GT15_FAIL=1
+fi
+if [[ "$GT15_FAIL" -eq 0 ]]; then
+  echo "PASS GT15"
+else
+  FAIL=1
+fi
+
 if [[ "$FAIL" -ne 0 ]]; then
   echo "GT SUITE FAILED"
   exit 1

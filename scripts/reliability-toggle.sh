@@ -149,7 +149,7 @@ agent["coding_instructions"] = f"""Proof-before-claim rules for coding and file 
 - If verification is impossible, say so explicitly and do not claim DONE or ship.
 - Prefer honest PARTIAL/FAILED over a polished false success.
 - Quote real tool output (paths that exist, pytest lines, exit codes). Do not use empty EVIDENCE theater.
-- For tests in a project: `{wrap} -- python3 -m pytest -q` (or truth run). Before claiming tests pass, call MCP verify_turn (mcp__truth__verify_turn) when available.
+- For pytest jobs in a user project: `{wrap} -- "$HERMES_VENV/python" -m pytest -q` (a python where import pytest succeeds; do not assume system python3 has pytest). Recipe gate suite is `python recipe/bin/test_claim_gate.py`, not pytest or unittest. Before claiming tests pass, call MCP verify_turn (mcp__truth__verify_turn) when available.
 - Wrong-directory greens do not count.
 - Host/live machine facts need tools this turn (or say BLOCKED). No tool cosplay in prose.
 - If the user forbids tools, or the claim is about another project/tree: do not start long exploratory pytest. Answer FAILED/PARTIAL.

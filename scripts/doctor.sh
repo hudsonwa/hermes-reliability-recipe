@@ -196,6 +196,35 @@ else
   fi
 fi
 
+# coding_instructions pytest interpreter (#6). Narrow:
+# python3 -m pytest named AND that python3 cannot import pytest → FAIL.
+# HERMES_VENV / import-ok instructions → skip. No pytest instruction → WARN only.
+if [[ -f "$HOME_P/config.yaml" ]]; then
+  CI_TEXT=$(HOME_P="$HOME_P" "$PY" - <<'PY'
+import os
+from pathlib import Path
+import yaml
+cfg = yaml.safe_load((Path(os.environ["HOME_P"]) / "config.yaml").read_text()) or {}
+agent = cfg.get("agent") or {}
+print(agent.get("coding_instructions") or "")
+PY
+)
+  if echo "$CI_TEXT" | grep -qF 'python3 -m pytest'; then
+    if command -v python3 >/dev/null 2>&1 && python3 -c 'import pytest' >/dev/null 2>&1; then
+      ok "python3 can import pytest"
+    else
+      fail "pytest_python_cannot_import"
+      note "hint: wrap a python that can import pytest (prefer \"\$HERMES_VENV/python\"); recipe suite is python recipe/bin/test_claim_gate.py"
+    fi
+  elif echo "$CI_TEXT" | grep -q 'HERMES_VENV' && echo "$CI_TEXT" | grep -q 'import pytest'; then
+    ok "coding_instructions pytest interpreter (venv/import-ok)"
+  elif echo "$CI_TEXT" | grep -qi 'pytest'; then
+    ok "coding_instructions mention pytest"
+  elif [[ -n "$CI_TEXT" ]]; then
+    note "WARN: coding_instructions have no pytest invocation (not failing; public clones need not install pytest)"
+  fi
+fi
+
 # hermes patch
 LOOP="${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}/agent/conversation_loop.py"
 if [[ -f "$LOOP" ]]; then

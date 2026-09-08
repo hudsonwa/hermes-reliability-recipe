@@ -11,10 +11,11 @@ Always-on claim gate is the hard stop. Truth strengthens **test/code** claims.
 ## When claiming tests pass / green / ship
 
 1. Run tests from the **project workdir** only.
-2. Prefer: `truth_run_wrap.sh -- python3 -m pytest -q` (or `truth run -- python3 -m pytest -q`) so a receipt is recorded.
-3. If MCP tool `mcp_truth_verify_turn` / `verify_turn` is available, call it on your own success paragraph before finishing.
-4. If verify_turn returns Contradicted or Unproven, do **not** ship — report FAILED/PARTIAL with the verdict.
-5. Foreign suites (e.g. 151 passed from another tree) never count.
+2. Prefer wrapping a python that can `import pytest` (typically `"$HERMES_VENV/python" -m pytest -q` via `truth_run_wrap.sh`, or `truth run -- "$HERMES_VENV/python" -m pytest -q`). Do not assume system `python3` has pytest.
+3. The recipe's own gate suite is **not** pytest: run `python recipe/bin/test_claim_gate.py` (not unittest, not `python3 -m pytest` on that file).
+4. If MCP tool `mcp_truth_verify_turn` / `verify_turn` is available, call it on your own success paragraph before finishing.
+5. If verify_turn returns Contradicted or Unproven, do **not** ship — report FAILED/PARTIAL with the verdict.
+6. Foreign suites (e.g. 151 passed from another tree) never count.
 
 ## When claiming file/code edits
 

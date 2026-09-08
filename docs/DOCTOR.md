@@ -34,9 +34,10 @@ One command replaces “I think it’s installed.” Failures name the missing p
 7. **Profile stack** — `pre_verify` hook, `verify_on_stop`, truth MCP (unless `--allow-no-truth`), coding_instructions, state, gate in profile bin
 8. **Profile gate hash** — sha256 of profile `bin/pre_verify_claim_gate.py` must match `recipe/bin/pre_verify_claim_gate.py`. Mismatch = `profile_gate_stale` (fail-closed). Skip with `HRR_DOCTOR_ALLOW_STALE_BINS=1` for an intentionally diverged profile only.
 9. **Profile gate-tests hash** — sha256 of profile `bin/test_claim_gate.py` vs recipe. Missing or mismatch = `profile_gate_tests_stale`. Same skip env as item 8 (not a second dialect).
-10. **Always-on pre_verify** in Hermes source (unless `--skip-patch`)
-11. **Recipe template** hazard lines
-12. **Profile working-style soft block** — one of three failure codes (see below)
+10. **Pytest interpreter** — if profile `coding_instructions` contain `python3 -m pytest` **and** that `python3` cannot `import pytest`, fail `pytest_python_cannot_import`. Venv/import-ok instructions skip. No pytest instruction → WARN only (do not force pytest on every public clone).
+11. **Always-on pre_verify** in Hermes source (unless `--skip-patch`)
+12. **Recipe template** hazard lines
+13. **Profile working-style soft block** — one of three failure codes (see below)
 
 ## Working-style soft block codes
 

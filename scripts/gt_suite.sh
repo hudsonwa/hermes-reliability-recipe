@@ -560,6 +560,76 @@ else
   FAIL=1
 fi
 
+echo "== GT17 doctor recopy hint --no-restart; toggle/install land tests file (#8) =="
+GT17_FAIL=0
+GT17_ROOT="$TMP/gt17-profiles"
+GT17_NAME="gt17x"
+mkdir -p "$GT17_ROOT/$GT17_NAME/bin"
+echo "agent: {}" >"$GT17_ROOT/$GT17_NAME/config.yaml"
+printf '# stale gate\nprint("old")\n' >"$GT17_ROOT/$GT17_NAME/bin/pre_verify_claim_gate.py"
+cp -f "$ROOT/recipe/bin/test_claim_gate.py" "$GT17_ROOT/$GT17_NAME/bin/test_claim_gate.py"
+GT17_OUT=$(HERMES_PROFILES_ROOT="$GT17_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT17_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+GT17_HINT="./scripts/reliability-toggle.sh on --profile $GT17_NAME --no-restart"
+if ! echo "$GT17_OUT" | grep -qF "$GT17_HINT"; then
+  echo "FAIL GT17a doctor missing exact recopy hint: $GT17_HINT"
+  echo "$GT17_OUT"
+  GT17_FAIL=1
+fi
+# also on tests-file stale
+cp -f "$ROOT/recipe/bin/pre_verify_claim_gate.py" "$GT17_ROOT/$GT17_NAME/bin/pre_verify_claim_gate.py"
+printf '# stale tests\n' >"$GT17_ROOT/$GT17_NAME/bin/test_claim_gate.py"
+GT17_OUT2=$(HERMES_PROFILES_ROOT="$GT17_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT17_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if ! echo "$GT17_OUT2" | grep -qF "$GT17_HINT"; then
+  echo "FAIL GT17a2 tests-stale missing exact recopy hint"
+  echo "$GT17_OUT2"
+  GT17_FAIL=1
+fi
+
+# toggle ensure_bins lands test_claim_gate.py (named loop)
+GT17T_ROOT="$TMP/gt17t-profiles"
+GT17T_NAME="gt17t"
+mkdir -p "$GT17T_ROOT/$GT17T_NAME"/{bin,state,logs,scripts}
+cat >"$GT17T_ROOT/$GT17T_NAME/config.yaml" <<'YAML'
+agent:
+  max_turns: 8
+model:
+  default: dummy
+YAML
+printf '# personal\n' >"$GT17T_ROOT/$GT17T_NAME/working-style-instruction.md"
+rm -f "$GT17T_ROOT/$GT17T_NAME/bin/test_claim_gate.py"
+if ! HERMES_PROFILES_ROOT="$GT17T_ROOT" \
+  bash "$ROOT/scripts/reliability-toggle.sh" on --profile "$GT17T_NAME" --no-restart >/tmp/hrr-gt17-tog.out 2>&1; then
+  echo "FAIL GT17b toggle on --no-restart"
+  cat /tmp/hrr-gt17-tog.out
+  GT17_FAIL=1
+fi
+if [[ ! -f "$GT17T_ROOT/$GT17T_NAME/bin/test_claim_gate.py" ]]; then
+  echo "FAIL GT17b toggle ensure_bins did not land test_claim_gate.py"
+  GT17_FAIL=1
+fi
+
+# install *.py glob lands test_claim_gate.py even if later install steps fail
+# (no config.yaml → skip toggle, so this is the glob, not ensure_bins).
+GT17I_ROOT="$TMP/gt17i-profiles"
+GT17I_NAME="gt17i"
+mkdir -p "$GT17I_ROOT/$GT17I_NAME"
+rm -f "$GT17I_ROOT/$GT17I_NAME/config.yaml"
+rm -f "$GT17I_ROOT/$GT17I_NAME/bin/test_claim_gate.py"
+HERMES_PROFILES_ROOT="$GT17I_ROOT" \
+  bash "$ROOT/scripts/install.sh" --profile "$GT17I_NAME" --skip-truth >/tmp/hrr-gt17-ins.out 2>&1 || true
+if [[ ! -f "$GT17I_ROOT/$GT17I_NAME/bin/test_claim_gate.py" ]]; then
+  echo "FAIL GT17c install glob did not land test_claim_gate.py"
+  cat /tmp/hrr-gt17-ins.out
+  GT17_FAIL=1
+fi
+if [[ "$GT17_FAIL" -eq 0 ]]; then
+  echo "PASS GT17"
+else
+  FAIL=1
+fi
+
 if [[ "$FAIL" -ne 0 ]]; then
   echo "GT SUITE FAILED"
   exit 1

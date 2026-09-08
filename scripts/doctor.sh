@@ -43,6 +43,9 @@ ISSUES=()
 note() { echo "  - $*"; }
 fail() { ISSUES+=("$1"); FAIL=1; note "FAIL: $1"; }
 ok() { note "ok: $1"; }
+hint_recopy_bins() {
+  echo "./scripts/reliability-toggle.sh on --profile $PROFILE --no-restart"
+}
 
 echo "== doctor profile=$PROFILE home=$HOME_P =="
 
@@ -172,7 +175,8 @@ else
     _pg="$(file_sha256 "$PROFILE_GATE")"
     if [[ "$_rg" != "$_pg" ]]; then
       fail "profile_gate_stale"
-      note "hint: profile bin/pre_verify_claim_gate.py does not match recipe/bin; .truth-stamps/05-doctor.PASS is last-writer — re-run doctor per profile"
+      hint_recopy_bins
+      note "hint: copy-paste the toggle line above (--no-restart does not bounce a gateway). .truth-stamps/05-doctor.PASS is last-writer — re-run doctor per profile"
     else
       ok "profile gate hash matches recipe"
     fi
@@ -182,13 +186,15 @@ else
   if [[ -f "$RECIPE_GATE_TESTS" ]]; then
     if [[ ! -f "$PROFILE_GATE_TESTS" ]]; then
       fail "profile_gate_tests_stale"
-      note "hint: profile bin/test_claim_gate.py missing (does not match recipe/bin)"
+      hint_recopy_bins
+      note "hint: profile bin/test_claim_gate.py missing; copy-paste the toggle line above"
     else
       _rt="$(file_sha256 "$RECIPE_GATE_TESTS")"
       _pt="$(file_sha256 "$PROFILE_GATE_TESTS")"
       if [[ "$_rt" != "$_pt" ]]; then
         fail "profile_gate_tests_stale"
-        note "hint: profile bin/test_claim_gate.py does not match recipe/bin; .truth-stamps/05-doctor.PASS is last-writer — re-run doctor per profile"
+        hint_recopy_bins
+        note "hint: profile bin/test_claim_gate.py does not match recipe/bin; copy-paste the toggle line above"
       else
         ok "profile gate tests hash matches recipe"
       fi

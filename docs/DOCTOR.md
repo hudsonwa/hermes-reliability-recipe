@@ -80,6 +80,12 @@ Default is fail. Do not set this on a normal install.
 
 The same skip env covers `test_claim_gate.py` (`profile_gate_tests_stale` when the profile copy is missing or its hash differs). There is not a second skip dialect.
 
+On `profile_gate_stale` or `profile_gate_tests_stale`, doctor prints this copy-paste recopy (no gateway restart):
+
+```bash
+./scripts/reliability-toggle.sh on --profile YOUR_PROFILE --no-restart
+```
+
 ## Tradeoffs
 
 | Tradeoff | Pro | Con |

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Record a command receipt via blasrodri/truth, then run it.
 # Usage: truth_run_wrap.sh [--] <cmd> [args...]
+# If truth is missing: exit 127 and do not run the command (no silent exec).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TRUTH_BIN="${TRUTH_BIN:-$SCRIPT_DIR/truth}"
@@ -9,7 +10,7 @@ if [[ ! -x "$TRUTH_BIN" ]]; then
     TRUTH_BIN="$(command -v truth)"
   else
     echo "truth binary missing: set TRUTH_BIN or install via scripts/fetch-truth.sh" >&2
-    exec "$@"
+    exit 127
   fi
 fi
 if [[ "${1:-}" == "--" ]]; then shift; fi

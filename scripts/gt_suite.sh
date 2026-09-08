@@ -301,6 +301,337 @@ else
   FAIL=1
 fi
 
+echo "== GT12 doctor fails when profile gate hash lags recipe (#3) =="
+# Isolated fake profile: older/different gate in profile bin vs recipe/bin.
+# Doctor must fail-closed profile_gate_stale. Matching hashes must not use that code.
+# Optional skip: HRR_DOCTOR_ALLOW_STALE_BINS=1 (intentionally diverged profiles).
+GT12_FAIL=0
+GT12_ROOT="$TMP/gt12-profiles"
+GT12_NAME="gt12g"
+mkdir -p "$GT12_ROOT/$GT12_NAME/bin"
+echo "agent: {}" >"$GT12_ROOT/$GT12_NAME/config.yaml"
+printf '# deliberately stale profile gate copy\nprint("old-gate")\n' >"$GT12_ROOT/$GT12_NAME/bin/pre_verify_claim_gate.py"
+GT12_OUT=$(HERMES_PROFILES_ROOT="$GT12_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT12_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if ! echo "$GT12_OUT" | grep -q "profile_gate_stale"; then
+  echo "FAIL GT12a stale gate not flagged profile_gate_stale"
+  echo "$GT12_OUT" | tail -20
+  GT12_FAIL=1
+fi
+cp -f "$ROOT/recipe/bin/pre_verify_claim_gate.py" "$GT12_ROOT/$GT12_NAME/bin/pre_verify_claim_gate.py"
+GT12_OUT2=$(HERMES_PROFILES_ROOT="$GT12_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT12_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT12_OUT2" | grep -q "profile_gate_stale"; then
+  echo "FAIL GT12b false profile_gate_stale when hashes match"
+  echo "$GT12_OUT2" | tail -20
+  GT12_FAIL=1
+fi
+printf '# stale again for skip-env\nprint("old-gate")\n' >"$GT12_ROOT/$GT12_NAME/bin/pre_verify_claim_gate.py"
+GT12_OUT3=$(HRR_DOCTOR_ALLOW_STALE_BINS=1 HERMES_PROFILES_ROOT="$GT12_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT12_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT12_OUT3" | grep -q "profile_gate_stale"; then
+  echo "FAIL GT12c HRR_DOCTOR_ALLOW_STALE_BINS=1 still flagged profile_gate_stale"
+  echo "$GT12_OUT3" | tail -20
+  GT12_FAIL=1
+fi
+if [[ "$GT12_FAIL" -eq 0 ]]; then
+  echo "PASS GT12"
+else
+  FAIL=1
+fi
+
+echo "== GT13 doctor fails when profile test_claim_gate.py lags or is absent (#4) =="
+# Sibling of #3: distinct fail code profile_gate_tests_stale.
+# Same skip env HRR_DOCTOR_ALLOW_STALE_BINS=1 (do not add a second dialect).
+GT13_FAIL=0
+GT13_ROOT="$TMP/gt13-profiles"
+GT13_NAME="gt13t"
+mkdir -p "$GT13_ROOT/$GT13_NAME/bin"
+echo "agent: {}" >"$GT13_ROOT/$GT13_NAME/config.yaml"
+cp -f "$ROOT/recipe/bin/pre_verify_claim_gate.py" "$GT13_ROOT/$GT13_NAME/bin/pre_verify_claim_gate.py"
+# a) absent unit file
+rm -f "$GT13_ROOT/$GT13_NAME/bin/test_claim_gate.py"
+GT13_OUT=$(HERMES_PROFILES_ROOT="$GT13_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT13_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if ! echo "$GT13_OUT" | grep -q "profile_gate_tests_stale"; then
+  echo "FAIL GT13a absent test_claim_gate.py not flagged"
+  echo "$GT13_OUT"
+  GT13_FAIL=1
+fi
+# b) mismatch
+printf '# stale unit file\nprint("old-tests")\n' >"$GT13_ROOT/$GT13_NAME/bin/test_claim_gate.py"
+GT13_OUT2=$(HERMES_PROFILES_ROOT="$GT13_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT13_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if ! echo "$GT13_OUT2" | grep -q "profile_gate_tests_stale"; then
+  echo "FAIL GT13b stale test_claim_gate.py not flagged"
+  echo "$GT13_OUT2"
+  GT13_FAIL=1
+fi
+# c) matching hash
+cp -f "$ROOT/recipe/bin/test_claim_gate.py" "$GT13_ROOT/$GT13_NAME/bin/test_claim_gate.py"
+GT13_OUT3=$(HERMES_PROFILES_ROOT="$GT13_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT13_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT13_OUT3" | grep -q "profile_gate_tests_stale"; then
+  echo "FAIL GT13c false profile_gate_tests_stale when hashes match"
+  echo "$GT13_OUT3"
+  GT13_FAIL=1
+fi
+# d) skip env on absent file
+rm -f "$GT13_ROOT/$GT13_NAME/bin/test_claim_gate.py"
+GT13_OUT4=$(HRR_DOCTOR_ALLOW_STALE_BINS=1 HERMES_PROFILES_ROOT="$GT13_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT13_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT13_OUT4" | grep -q "profile_gate_tests_stale"; then
+  echo "FAIL GT13d skip env still flagged profile_gate_tests_stale"
+  echo "$GT13_OUT4"
+  GT13_FAIL=1
+fi
+if [[ "$GT13_FAIL" -eq 0 ]]; then
+  echo "PASS GT13"
+else
+  FAIL=1
+fi
+
+echo "== GT14 truth_run_wrap fail-closed when truth missing (#5) =="
+# Missing truth must exit non-zero and MUST NOT run the wrapped command.
+# No passthrough env. Actionable stderr names fetch-truth.sh or TRUTH_BIN=.
+GT14_FAIL=0
+GT14_SENTINEL="$TMP/gt14-wrapped-ran"
+rm -f "$GT14_SENTINEL"
+GT14_RC=0
+PATH=/usr/bin:/bin TRUTH_BIN=/no/such/truth-bin \
+  bash "$ROOT/recipe/bin/truth_run_wrap.sh" -- \
+  sh -c "echo RAN > \"$GT14_SENTINEL\"" \
+  >"$TMP/gt14.out" 2>"$TMP/gt14.err" || GT14_RC=$?
+if [[ -f "$GT14_SENTINEL" ]]; then
+  echo "FAIL GT14 wrapped command ran despite missing truth"
+  GT14_FAIL=1
+fi
+if [[ "$GT14_RC" -eq 0 ]]; then
+  echo "FAIL GT14 exit 0 on missing truth (want non-zero, 127 is fine)"
+  GT14_FAIL=1
+fi
+if ! grep -qE 'fetch-truth\.sh|TRUTH_BIN' "$TMP/gt14.err"; then
+  echo "FAIL GT14 stderr missing fetch-truth.sh or TRUTH_BIN= hint"
+  cat "$TMP/gt14.err"
+  GT14_FAIL=1
+fi
+if [[ "$GT14_FAIL" -eq 0 ]]; then
+  echo "PASS GT14 (rc=$GT14_RC)"
+else
+  FAIL=1
+fi
+
+echo "== GT15 venv python for pytest; recipe suite is not pytest (#6) =="
+GT15_FAIL=0
+# skills / template / toggle: wrap a python that can import pytest; name the gate suite
+for f in \
+  "$ROOT/recipe/skills/reliability/SKILL.md" \
+  "$ROOT/recipe/skills/reliability/truth-pytest-receipts/SKILL.md"
+do
+  if ! grep -q 'HERMES_VENV\|import pytest' "$f"; then
+    echo "FAIL GT15 $f missing HERMES_VENV or import pytest"
+    GT15_FAIL=1
+  fi
+  if ! grep -q 'recipe/bin/test_claim_gate.py' "$f"; then
+    echo "FAIL GT15 $f missing canonical gate suite path"
+    GT15_FAIL=1
+  fi
+  if grep -q 'truth_run_wrap.sh -- python3 -m pytest' "$f" \
+     || grep -q 'truth run -- python3 -m pytest' "$f"; then
+    echo "FAIL GT15 $f still wraps system python3 -m pytest"
+    GT15_FAIL=1
+  fi
+done
+if ! grep -q 'test_claim_gate.py' "$ROOT/recipe/templates/working-style-instruction.md"; then
+  echo "FAIL GT15 working-style missing gate suite path"
+  GT15_FAIL=1
+fi
+if grep -q 'python3 -m pytest' "$ROOT/scripts/reliability-toggle.sh"; then
+  echo "FAIL GT15 toggle still embeds python3 -m pytest in coding_instructions"
+  GT15_FAIL=1
+fi
+if ! grep -q 'HERMES_VENV' "$ROOT/scripts/reliability-toggle.sh"; then
+  echo "FAIL GT15 toggle coding_instructions missing HERMES_VENV"
+  GT15_FAIL=1
+fi
+
+# doctor: python3 -m pytest in coding_instructions + python3 cannot import pytest → FAIL
+GT15_ROOT="$TMP/gt15-profiles"
+GT15_NAME="gt15p"
+GT15_BIN="$TMP/gt15-bin"
+mkdir -p "$GT15_ROOT/$GT15_NAME/bin" "$GT15_BIN"
+cp -f "$ROOT/recipe/bin/pre_verify_claim_gate.py" "$GT15_ROOT/$GT15_NAME/bin/"
+cp -f "$ROOT/recipe/bin/test_claim_gate.py" "$GT15_ROOT/$GT15_NAME/bin/"
+printf '%s\n' "#!/bin/sh
+if [ \"\$1\" = \"-c\" ] && echo \"\$2\" | grep -q pytest; then exit 1; fi
+exec $PY \"\$@\"
+" >"$GT15_BIN/python3"
+chmod +x "$GT15_BIN/python3"
+cat >"$GT15_ROOT/$GT15_NAME/config.yaml" <<'YAML'
+agent:
+  coding_instructions: |
+    For tests in a project: wrap -- python3 -m pytest -q
+YAML
+# HERMES_PYTHON keeps doctor yaml/stack checks on the suite interpreter.
+# PATH python3 is the stub so "python3 -m pytest" import-check fails.
+GT15_OUT=$(HERMES_PYTHON="$PY" PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT15_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if ! echo "$GT15_OUT" | grep -q "pytest_python_cannot_import"; then
+  echo "FAIL GT15a doctor did not fail pytest_python_cannot_import"
+  echo "$GT15_OUT"
+  GT15_FAIL=1
+fi
+# no pytest instruction → WARN only, not that fail code
+cat >"$GT15_ROOT/$GT15_NAME/config.yaml" <<'YAML'
+agent:
+  coding_instructions: |
+    Proof-before-claim. Quote tool output.
+YAML
+GT15_OUT2=$(HERMES_PYTHON="$PY" PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT15_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT15_OUT2" | grep -q "pytest_python_cannot_import"; then
+  echo "FAIL GT15b no-pytest instruction still failed pytest_python_cannot_import"
+  echo "$GT15_OUT2"
+  GT15_FAIL=1
+fi
+if ! echo "$GT15_OUT2" | grep -qi "WARN.*pytest"; then
+  echo "FAIL GT15b expected WARN when coding_instructions have no pytest"
+  echo "$GT15_OUT2"
+  GT15_FAIL=1
+fi
+# venv/import-ok instructions → skip even if python3 cannot import pytest
+cat >"$GT15_ROOT/$GT15_NAME/config.yaml" <<'YAML'
+agent:
+  coding_instructions: |
+    For pytest: wrap -- "$HERMES_VENV/python" -m pytest -q
+    (a python where import pytest succeeds).
+YAML
+GT15_OUT3=$(HERMES_PYTHON="$PY" PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT15_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT15_OUT3" | grep -q "pytest_python_cannot_import"; then
+  echo "FAIL GT15c venv/import-ok instructions still failed pytest_python_cannot_import"
+  echo "$GT15_OUT3"
+  GT15_FAIL=1
+fi
+if [[ "$GT15_FAIL" -eq 0 ]]; then
+  echo "PASS GT15"
+else
+  FAIL=1
+fi
+
+echo "== GT16 unittest discovery must not 0-test OK (#7) =="
+# Keep the __main__ runner. python -m unittest must not print Ran 0 tests / OK.
+GT16_FAIL=0
+GT16_RC=0
+GT16_OUT=$("$PY" -m unittest recipe.bin.test_claim_gate 2>&1) || GT16_RC=$?
+if echo "$GT16_OUT" | grep -qE 'Ran 0 tests' && echo "$GT16_OUT" | grep -qE '(^|\s)OK(\s|$)'; then
+  echo "FAIL GT16a vacuous 0-test OK from python -m unittest recipe.bin.test_claim_gate"
+  echo "$GT16_OUT"
+  GT16_FAIL=1
+fi
+if [[ "$GT16_RC" -eq 0 ]]; then
+  echo "FAIL GT16a unittest discovery exited 0"
+  echo "$GT16_OUT"
+  GT16_FAIL=1
+fi
+if ! echo "$GT16_OUT" | grep -q 'recipe/bin/test_claim_gate.py'; then
+  echo "FAIL GT16a stderr/stdout missing canonical runner path"
+  echo "$GT16_OUT"
+  GT16_FAIL=1
+fi
+GT16_RC2=0
+GT16_OUT2=$(cd "$ROOT/recipe/bin" && "$PY" -m unittest test_claim_gate 2>&1) || GT16_RC2=$?
+if echo "$GT16_OUT2" | grep -qE 'Ran 0 tests' && echo "$GT16_OUT2" | grep -qE '(^|\s)OK(\s|$)'; then
+  echo "FAIL GT16b vacuous 0-test OK from recipe/bin unittest test_claim_gate"
+  echo "$GT16_OUT2"
+  GT16_FAIL=1
+fi
+if [[ "$GT16_RC2" -eq 0 ]]; then
+  echo "FAIL GT16b recipe/bin unittest discovery exited 0"
+  echo "$GT16_OUT2"
+  GT16_FAIL=1
+fi
+if ! "$PY" "$ROOT/recipe/bin/test_claim_gate.py" >/tmp/hrr-gt16-main.out 2>&1; then
+  echo "FAIL GT16c __main__ runner broken"
+  cat /tmp/hrr-gt16-main.out
+  GT16_FAIL=1
+fi
+if [[ "$GT16_FAIL" -eq 0 ]]; then
+  echo "PASS GT16"
+else
+  FAIL=1
+fi
+
+echo "== GT17 doctor recopy hint --no-restart; toggle/install land tests file (#8) =="
+GT17_FAIL=0
+GT17_ROOT="$TMP/gt17-profiles"
+GT17_NAME="gt17x"
+mkdir -p "$GT17_ROOT/$GT17_NAME/bin"
+echo "agent: {}" >"$GT17_ROOT/$GT17_NAME/config.yaml"
+printf '# stale gate\nprint("old")\n' >"$GT17_ROOT/$GT17_NAME/bin/pre_verify_claim_gate.py"
+cp -f "$ROOT/recipe/bin/test_claim_gate.py" "$GT17_ROOT/$GT17_NAME/bin/test_claim_gate.py"
+GT17_OUT=$(HERMES_PROFILES_ROOT="$GT17_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT17_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+GT17_HINT="./scripts/reliability-toggle.sh on --profile $GT17_NAME --no-restart"
+if ! echo "$GT17_OUT" | grep -qF "$GT17_HINT"; then
+  echo "FAIL GT17a doctor missing exact recopy hint: $GT17_HINT"
+  echo "$GT17_OUT"
+  GT17_FAIL=1
+fi
+# also on tests-file stale
+cp -f "$ROOT/recipe/bin/pre_verify_claim_gate.py" "$GT17_ROOT/$GT17_NAME/bin/pre_verify_claim_gate.py"
+printf '# stale tests\n' >"$GT17_ROOT/$GT17_NAME/bin/test_claim_gate.py"
+GT17_OUT2=$(HERMES_PROFILES_ROOT="$GT17_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT17_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if ! echo "$GT17_OUT2" | grep -qF "$GT17_HINT"; then
+  echo "FAIL GT17a2 tests-stale missing exact recopy hint"
+  echo "$GT17_OUT2"
+  GT17_FAIL=1
+fi
+
+# toggle ensure_bins lands test_claim_gate.py (named loop)
+GT17T_ROOT="$TMP/gt17t-profiles"
+GT17T_NAME="gt17t"
+mkdir -p "$GT17T_ROOT/$GT17T_NAME"/{bin,state,logs,scripts}
+cat >"$GT17T_ROOT/$GT17T_NAME/config.yaml" <<'YAML'
+agent:
+  max_turns: 8
+model:
+  default: dummy
+YAML
+printf '# personal\n' >"$GT17T_ROOT/$GT17T_NAME/working-style-instruction.md"
+rm -f "$GT17T_ROOT/$GT17T_NAME/bin/test_claim_gate.py"
+if ! HERMES_PROFILES_ROOT="$GT17T_ROOT" \
+  bash "$ROOT/scripts/reliability-toggle.sh" on --profile "$GT17T_NAME" --no-restart >/tmp/hrr-gt17-tog.out 2>&1; then
+  echo "FAIL GT17b toggle on --no-restart"
+  cat /tmp/hrr-gt17-tog.out
+  GT17_FAIL=1
+fi
+if [[ ! -f "$GT17T_ROOT/$GT17T_NAME/bin/test_claim_gate.py" ]]; then
+  echo "FAIL GT17b toggle ensure_bins did not land test_claim_gate.py"
+  GT17_FAIL=1
+fi
+
+# install *.py glob lands test_claim_gate.py even if later install steps fail
+# (no config.yaml → skip toggle, so this is the glob, not ensure_bins).
+GT17I_ROOT="$TMP/gt17i-profiles"
+GT17I_NAME="gt17i"
+mkdir -p "$GT17I_ROOT/$GT17I_NAME"
+rm -f "$GT17I_ROOT/$GT17I_NAME/config.yaml"
+rm -f "$GT17I_ROOT/$GT17I_NAME/bin/test_claim_gate.py"
+HERMES_PROFILES_ROOT="$GT17I_ROOT" \
+  bash "$ROOT/scripts/install.sh" --profile "$GT17I_NAME" --skip-truth >/tmp/hrr-gt17-ins.out 2>&1 || true
+if [[ ! -f "$GT17I_ROOT/$GT17I_NAME/bin/test_claim_gate.py" ]]; then
+  echo "FAIL GT17c install glob did not land test_claim_gate.py"
+  cat /tmp/hrr-gt17-ins.out
+  GT17_FAIL=1
+fi
+if [[ "$GT17_FAIL" -eq 0 ]]; then
+  echo "PASS GT17"
+else
+  FAIL=1
+fi
+
 if [[ "$FAIL" -ne 0 ]]; then
   echo "GT SUITE FAILED"
   exit 1

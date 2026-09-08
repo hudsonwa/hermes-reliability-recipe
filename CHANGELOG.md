@@ -2,6 +2,32 @@
 
 All notable changes to the reliability recipe. Dates are UTC.
 
+## v0.2.2 — 2026-09-08
+
+### Fixed
+- **Doctor profile gate hash (#3):** sha256 of profile
+  `bin/pre_verify_claim_gate.py` vs recipe. Mismatch = `profile_gate_stale`.
+  Skip with `HRR_DOCTOR_ALLOW_STALE_BINS=1` (intentionally diverged only).
+- **Doctor profile tests-file hash (#4):** missing or mismatched
+  `test_claim_gate.py` = `profile_gate_tests_stale`. Same skip env.
+- **truth_run_wrap (#5):** missing truth exits 127 and does not run the
+  wrapped command (no silent exec, no passthrough env).
+- **Pytest interpreter (#6):** skills/toggle wrap a python that can
+  `import pytest` (prefer `$HERMES_VENV/python`). Recipe suite is
+  `python recipe/bin/test_claim_gate.py`. Doctor fails
+  `pytest_python_cannot_import` only when instructions name
+  `python3 -m pytest` and that python cannot import pytest.
+- **Vacuous unittest (#7):** `load_tests` fails loud; keep `__main__`
+  runner. Do not unittest this file.
+- **Recopy hint (#8):** on stale bins, doctor prints
+  `./scripts/reliability-toggle.sh on --profile NAME --no-restart`.
+- **Quoted stamp PASS (#9):** strip fenced/`>`-quoted text before claim
+  regexes. `SUCCESS_PAT` / `TESTS_PASS_CLAIM` unchanged. First-person
+  “All tests passed. Ship it.” still blocked without a receipt.
+
+### Tests
+- GT12–GT17 on `scripts/gt_suite.sh`. Gate unit list is 14 cases.
+
 ## v0.2.1 — 2026-09-07
 
 ### Fixed

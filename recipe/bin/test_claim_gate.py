@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Unit tests for claim gate v2 (generic public recipe)."""
+"""Unit tests for claim gate v2 (generic public recipe).
+
+Run as: python recipe/bin/test_claim_gate.py
+Do not run via unittest (python -m unittest recipe.bin.test_claim_gate).
+"""
 from __future__ import annotations
 
 import json
@@ -11,6 +15,13 @@ from pathlib import Path
 GATE = Path(__file__).resolve().parent / "pre_verify_claim_gate.py"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pre_verify_claim_gate import evaluate  # noqa: E402
+
+
+def load_tests(loader, standard_tests, pattern):  # noqa: ARG001
+    """Unittest discovery must not report Ran 0 tests / OK (exit 0)."""
+    raise RuntimeError(
+        "not a unittest module; run as python recipe/bin/test_claim_gate.py"
+    )
 
 
 def run_hook(payload: dict) -> dict:
@@ -125,6 +136,37 @@ def test_planning_verify_prose_untouched():
     assert evaluate(final, 0, cwd="/tmp/proj") == {}
 
 
+def test_fenced_stamp_pass_not_alone_tests_green():
+    """Quoted/fenced stamp PASS must not alone trip tests-green (#9)."""
+    final = (
+        "Quoted doctor stamp:\n"
+        "```\n"
+        "status=PASS\n"
+        "DOCTOR PASS\n"
+        "RESULT: PASS\n"
+        "exit_code=0\n"
+        "```\n"
+    )
+    assert evaluate(final, 0, cwd="/tmp/proj") == {}
+
+
+def test_blockquote_stamp_pass_not_alone_tests_green():
+    """Quoted '>' stamp PASS must not alone trip tests-green (#9)."""
+    final = (
+        "Quoted:\n"
+        "> status=PASS\n"
+        "> DOCTOR PASS\n"
+        "> RESULT: PASS\n"
+        "> exit_code=0\n"
+    )
+    assert evaluate(final, 0, cwd="/tmp/proj") == {}
+
+
+def test_first_person_all_tests_passed_ship_still_blocked():
+    """First-person tests-passed/ship still blocked without a receipt (#9)."""
+    assert evaluate("All tests passed. Ship it.", 0, cwd="/tmp/proj").get("action") == "continue"
+
+
 def main() -> int:
     tests = [
         test_smoking_gun_blocked,
@@ -138,6 +180,9 @@ def main() -> int:
         test_verified_done_without_coverage_blocked,
         test_verified_done_with_coverage_allowed,
         test_planning_verify_prose_untouched,
+        test_fenced_stamp_pass_not_alone_tests_green,
+        test_blockquote_stamp_pass_not_alone_tests_green,
+        test_first_person_all_tests_passed_ship_still_blocked,
     ]
     failed = 0
     for t in tests:

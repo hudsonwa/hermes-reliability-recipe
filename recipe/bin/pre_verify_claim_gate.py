@@ -225,14 +225,26 @@ def _local_test_receipt(final: str, cwd: str) -> bool:
     return bool(TEST_RECEIPT.search(final) and FAIL_OK.search(final))
 
 
+def _strip_quoted_for_claims(text: str) -> str:
+    """Drop fenced blocks and markdown '>' quotes before claim regexes.
+
+    Quoted stamp dumps (RESULT: PASS / DOCTOR PASS) must not alone trip
+    tests-green. Regexes themselves stay unchanged.
+    """
+    stripped = re.sub(r"```.*?```", "\n", text, flags=re.S)
+    stripped = re.sub(r"(?m)^>[^\n]*\n?", "", stripped)
+    return stripped
+
+
 def evaluate(final: str, attempt: int, changed_paths: list | None = None, cwd: str = "") -> dict:
     changed_paths = changed_paths or []
     final = final or ""
     cwd = cwd or ""
+    claims = _strip_quoted_for_claims(final)
 
-    honest = bool(FAIL_OK.search(final))
-    claims_tests_pass = bool(TESTS_PASS_CLAIM.search(final))
-    has_success = bool(SUCCESS_PAT.search(final)) or claims_tests_pass
+    honest = bool(FAIL_OK.search(claims))
+    claims_tests_pass = bool(TESTS_PASS_CLAIM.search(claims))
+    has_success = bool(SUCCESS_PAT.search(claims)) or claims_tests_pass
 
     if honest and not claims_tests_pass and not _stats_pattern().search(final):
         return {}

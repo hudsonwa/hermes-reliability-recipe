@@ -28,13 +28,16 @@ One command replaces “I think it’s installed.” Failures name the missing p
 1. **Hermes on PATH** (falls back to known venv install locations in non-interactive shells)
 2. **PyYAML** (via resolved Python — Hermes venv / python3 / python3.11 / …)
 3. **Recipe claim gate** present
-4. **Gate unit tests** (11 unit tests + 5 seam-ledger tests)
+4. **Gate unit tests** (function-list runner: `python recipe/bin/test_claim_gate.py`, not unittest)
 5. **Truth binary** — present **and runnable** (not just `chmod +x`)
 6. **Truth-mcp binary** present
 7. **Profile stack** — `pre_verify` hook, `verify_on_stop`, truth MCP (unless `--allow-no-truth`), coding_instructions, state, gate in profile bin
-8. **Always-on pre_verify** in Hermes source (unless `--skip-patch`)
-9. **Recipe template** hazard lines
-10. **Profile working-style soft block** — one of three failure codes (see below)
+8. **Profile gate hash** — sha256 of profile `bin/pre_verify_claim_gate.py` must match `recipe/bin/pre_verify_claim_gate.py`. Mismatch = `profile_gate_stale` (fail-closed). Skip with `HRR_DOCTOR_ALLOW_STALE_BINS=1` for an intentionally diverged profile only.
+9. **Profile gate-tests hash** — sha256 of profile `bin/test_claim_gate.py` vs recipe. Missing or mismatch = `profile_gate_tests_stale`. Same skip env as item 8 (not a second dialect).
+10. **Pytest interpreter** — if profile `coding_instructions` contain `python3 -m pytest` **and** that `python3` cannot `import pytest`, fail `pytest_python_cannot_import`. Venv/import-ok instructions skip. No pytest instruction → WARN only (do not force pytest on every public clone).
+11. **Always-on pre_verify** in Hermes source (unless `--skip-patch`)
+12. **Recipe template** hazard lines
+13. **Profile working-style soft block** — one of three failure codes (see below)
 
 ## Working-style soft block codes
 
@@ -59,6 +62,28 @@ It prints the found binary and the PATH line to add; only when none exists does 
 ```bash
 export PATH="$HOME/.hermes/hermes-agent/venv/bin:$PATH"
 ./scripts/doctor.sh --profile YOUR_PROFILE
+```
+
+## Profile gate hash (`profile_gate_stale`)
+
+Doctor used to PASS when the live profile still ran an old `pre_verify_claim_gate.py`. It now sha256-compares that file to the recipe copy and fails `profile_gate_stale` on mismatch.
+
+`.truth-stamps/05-doctor.PASS` is **last-writer**: a PASS for profile A does not mean profile B is hashed-fresh. Re-run doctor per profile.
+
+Intentionally diverged profiles (you keep a patched gate on purpose):
+
+```bash
+HRR_DOCTOR_ALLOW_STALE_BINS=1 ./scripts/doctor.sh --profile YOUR_PROFILE
+```
+
+Default is fail. Do not set this on a normal install.
+
+The same skip env covers `test_claim_gate.py` (`profile_gate_tests_stale` when the profile copy is missing or its hash differs). There is not a second skip dialect.
+
+On `profile_gate_stale` or `profile_gate_tests_stale`, doctor prints this copy-paste recopy (no gateway restart):
+
+```bash
+./scripts/reliability-toggle.sh on --profile YOUR_PROFILE --no-restart
 ```
 
 ## Tradeoffs
@@ -93,6 +118,9 @@ Doctor is the “is the lie detector plugged in?” button. Green means the piec
 
 # Claim-gate-only: do not fail if truth / truth-mcp missing or not runnable
 ./scripts/doctor.sh --profile YOUR_PROFILE --allow-no-truth
+
+# Intentionally diverged profile gate (skip sha256 vs recipe)
+HRR_DOCTOR_ALLOW_STALE_BINS=1 ./scripts/doctor.sh --profile YOUR_PROFILE
 ```
 
 ## Output

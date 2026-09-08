@@ -146,6 +146,19 @@ write_stamp() {
   echo "$f"
 }
 
+# Portable sha256 of a file (hex digest only). Used by doctor bin-hash checks.
+file_sha256() {
+  local f="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$f" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$f" | awk '{print $1}'
+  else
+    resolve_python >/dev/null
+    "$(resolve_python)" -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$f"
+  fi
+}
+
 # Marker that brackets the append-only reliability soft block in working-style.
 ws_soft_marker() {
   echo "# Reliability stack (hermes-reliability-recipe)"

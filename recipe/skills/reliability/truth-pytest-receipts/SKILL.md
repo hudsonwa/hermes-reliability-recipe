@@ -10,11 +10,13 @@ version: 1.0.0
 Never claim tests pass/green/ship without a receipt bound to **this** project directory.
 
 ## How to run tests
-Prefer the full path wrapper (profile bin):
+Prefer the full path wrapper (profile bin) and a python that can `import pytest`:
 
 ```bash
-~/.hermes/profiles/<PROFILE>/bin/truth_run_wrap.sh -- python3 -m pytest -q
+~/.hermes/profiles/<PROFILE>/bin/truth_run_wrap.sh -- "$HERMES_VENV/python" -m pytest -q
 ```
+
+Do not assume system `python3` has pytest. The recipe's own gate suite is **not** pytest: run `python recipe/bin/test_claim_gate.py` (not unittest, not pytest on that file).
 
 If `truth` is not initialized in the repo:
 

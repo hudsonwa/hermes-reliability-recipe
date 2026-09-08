@@ -12,6 +12,7 @@ PRs welcome, especially for:
 
 - Run `make test-quick` — must pass
 - Run `make scrub` — must pass (no token-shaped secrets; maintainer needles stay in gitignored `scripts/scrub-needles.local`)
+- Gate units: `python recipe/bin/test_claim_gate.py` (not unittest, not pytest on that file)
 - Keep docs in plain English with the What/Who/Where/When/Why/Tradeoffs/Recommendation format
 - Do not commit `scripts/scrub-needles.local`, `.env`, session dumps, or `recipe/bin/truth`
 

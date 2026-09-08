@@ -22,6 +22,9 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "  --allow-no-truth   Do not fail if truth binary is missing/unrunnable"
       echo "                     (claim-gate-only installs on older GLIBC)"
+      echo "  HRR_DOCTOR_ALLOW_STALE_BINS=1"
+      echo "                     Skip profile vs recipe sha256 of claim-gate bins"
+      echo "                     (intentionally diverged profiles only; default is fail)"
       exit 0
       ;;
     *) echo "unknown: $1" >&2; exit 2 ;;
@@ -40,6 +43,9 @@ ISSUES=()
 note() { echo "  - $*"; }
 fail() { ISSUES+=("$1"); FAIL=1; note "FAIL: $1"; }
 ok() { note "ok: $1"; }
+hint_recopy_bins() {
+  echo "./scripts/reliability-toggle.sh on --profile $PROFILE --no-restart"
+}
 
 echo "== doctor profile=$PROFILE home=$HOME_P =="
 
@@ -152,6 +158,76 @@ PY
     ok "profile stack config"
   else
     fail "profile_stack:$DIAG"
+  fi
+fi
+
+# profile claim-gate file vs recipe (#3). Existence is profile_gate_missing
+# (DIAG). Byte mismatch is fail-closed profile_gate_stale.
+# profile test_claim_gate.py vs recipe (#4): missing OR mismatch =
+# profile_gate_tests_stale. Same skip: HRR_DOCTOR_ALLOW_STALE_BINS=1.
+if [[ "${HRR_DOCTOR_ALLOW_STALE_BINS:-0}" == "1" ]]; then
+  note "WARN: skipping profile bin hash vs recipe (HRR_DOCTOR_ALLOW_STALE_BINS=1)"
+else
+  RECIPE_GATE="$RECIPE_ROOT/recipe/bin/pre_verify_claim_gate.py"
+  PROFILE_GATE="$HOME_P/bin/pre_verify_claim_gate.py"
+  if [[ -f "$RECIPE_GATE" && -f "$PROFILE_GATE" ]]; then
+    _rg="$(file_sha256 "$RECIPE_GATE")"
+    _pg="$(file_sha256 "$PROFILE_GATE")"
+    if [[ "$_rg" != "$_pg" ]]; then
+      fail "profile_gate_stale"
+      hint_recopy_bins
+      note "hint: copy-paste the toggle line above (--no-restart does not bounce a gateway). .truth-stamps/05-doctor.PASS is last-writer — re-run doctor per profile"
+    else
+      ok "profile gate hash matches recipe"
+    fi
+  fi
+  RECIPE_GATE_TESTS="$RECIPE_ROOT/recipe/bin/test_claim_gate.py"
+  PROFILE_GATE_TESTS="$HOME_P/bin/test_claim_gate.py"
+  if [[ -f "$RECIPE_GATE_TESTS" ]]; then
+    if [[ ! -f "$PROFILE_GATE_TESTS" ]]; then
+      fail "profile_gate_tests_stale"
+      hint_recopy_bins
+      note "hint: profile bin/test_claim_gate.py missing; copy-paste the toggle line above"
+    else
+      _rt="$(file_sha256 "$RECIPE_GATE_TESTS")"
+      _pt="$(file_sha256 "$PROFILE_GATE_TESTS")"
+      if [[ "$_rt" != "$_pt" ]]; then
+        fail "profile_gate_tests_stale"
+        hint_recopy_bins
+        note "hint: profile bin/test_claim_gate.py does not match recipe/bin; copy-paste the toggle line above"
+      else
+        ok "profile gate tests hash matches recipe"
+      fi
+    fi
+  fi
+fi
+
+# coding_instructions pytest interpreter (#6). Narrow:
+# python3 -m pytest named AND that python3 cannot import pytest → FAIL.
+# HERMES_VENV / import-ok instructions → skip. No pytest instruction → WARN only.
+if [[ -f "$HOME_P/config.yaml" ]]; then
+  CI_TEXT=$(HOME_P="$HOME_P" "$PY" - <<'PY'
+import os
+from pathlib import Path
+import yaml
+cfg = yaml.safe_load((Path(os.environ["HOME_P"]) / "config.yaml").read_text()) or {}
+agent = cfg.get("agent") or {}
+print(agent.get("coding_instructions") or "")
+PY
+)
+  if echo "$CI_TEXT" | grep -qF 'python3 -m pytest'; then
+    if command -v python3 >/dev/null 2>&1 && python3 -c 'import pytest' >/dev/null 2>&1; then
+      ok "python3 can import pytest"
+    else
+      fail "pytest_python_cannot_import"
+      note "hint: wrap a python that can import pytest (prefer \"\$HERMES_VENV/python\"); recipe suite is python recipe/bin/test_claim_gate.py"
+    fi
+  elif echo "$CI_TEXT" | grep -q 'HERMES_VENV' && echo "$CI_TEXT" | grep -q 'import pytest'; then
+    ok "coding_instructions pytest interpreter (venv/import-ok)"
+  elif echo "$CI_TEXT" | grep -qi 'pytest'; then
+    ok "coding_instructions mention pytest"
+  elif [[ -n "$CI_TEXT" ]]; then
+    note "WARN: coding_instructions have no pytest invocation (not failing; public clones need not install pytest)"
   fi
 fi
 

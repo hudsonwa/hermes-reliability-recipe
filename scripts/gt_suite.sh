@@ -517,6 +517,49 @@ else
   FAIL=1
 fi
 
+echo "== GT16 unittest discovery must not 0-test OK (#7) =="
+# Keep the __main__ runner. python -m unittest must not print Ran 0 tests / OK.
+GT16_FAIL=0
+GT16_RC=0
+GT16_OUT=$("$PY" -m unittest recipe.bin.test_claim_gate 2>&1) || GT16_RC=$?
+if echo "$GT16_OUT" | grep -qE 'Ran 0 tests' && echo "$GT16_OUT" | grep -qE '(^|\s)OK(\s|$)'; then
+  echo "FAIL GT16a vacuous 0-test OK from python -m unittest recipe.bin.test_claim_gate"
+  echo "$GT16_OUT"
+  GT16_FAIL=1
+fi
+if [[ "$GT16_RC" -eq 0 ]]; then
+  echo "FAIL GT16a unittest discovery exited 0"
+  echo "$GT16_OUT"
+  GT16_FAIL=1
+fi
+if ! echo "$GT16_OUT" | grep -q 'recipe/bin/test_claim_gate.py'; then
+  echo "FAIL GT16a stderr/stdout missing canonical runner path"
+  echo "$GT16_OUT"
+  GT16_FAIL=1
+fi
+GT16_RC2=0
+GT16_OUT2=$(cd "$ROOT/recipe/bin" && "$PY" -m unittest test_claim_gate 2>&1) || GT16_RC2=$?
+if echo "$GT16_OUT2" | grep -qE 'Ran 0 tests' && echo "$GT16_OUT2" | grep -qE '(^|\s)OK(\s|$)'; then
+  echo "FAIL GT16b vacuous 0-test OK from recipe/bin unittest test_claim_gate"
+  echo "$GT16_OUT2"
+  GT16_FAIL=1
+fi
+if [[ "$GT16_RC2" -eq 0 ]]; then
+  echo "FAIL GT16b recipe/bin unittest discovery exited 0"
+  echo "$GT16_OUT2"
+  GT16_FAIL=1
+fi
+if ! "$PY" "$ROOT/recipe/bin/test_claim_gate.py" >/tmp/hrr-gt16-main.out 2>&1; then
+  echo "FAIL GT16c __main__ runner broken"
+  cat /tmp/hrr-gt16-main.out
+  GT16_FAIL=1
+fi
+if [[ "$GT16_FAIL" -eq 0 ]]; then
+  echo "PASS GT16"
+else
+  FAIL=1
+fi
+
 if [[ "$FAIL" -ne 0 ]]; then
   echo "GT SUITE FAILED"
   exit 1

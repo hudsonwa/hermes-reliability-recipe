@@ -28,7 +28,7 @@ One command replaces “I think it’s installed.” Failures name the missing p
 1. **Hermes on PATH** (falls back to known venv install locations in non-interactive shells)
 2. **PyYAML** (via resolved Python — Hermes venv / python3 / python3.11 / …)
 3. **Recipe claim gate** present
-4. **Gate unit tests** (11 unit tests + 5 seam-ledger tests)
+4. **Gate unit tests** (function-list runner: `python recipe/bin/test_claim_gate.py`, not unittest)
 5. **Truth binary** — present **and runnable** (not just `chmod +x`)
 6. **Truth-mcp binary** present
 7. **Profile stack** — `pre_verify` hook, `verify_on_stop`, truth MCP (unless `--allow-no-truth`), coding_instructions, state, gate in profile bin

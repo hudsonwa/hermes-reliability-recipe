@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Unit tests for claim gate v2 (generic public recipe)."""
+"""Unit tests for claim gate v2 (generic public recipe).
+
+Run as: python recipe/bin/test_claim_gate.py
+Do not run via unittest (python -m unittest recipe.bin.test_claim_gate).
+"""
 from __future__ import annotations
 
 import json
@@ -11,6 +15,13 @@ from pathlib import Path
 GATE = Path(__file__).resolve().parent / "pre_verify_claim_gate.py"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pre_verify_claim_gate import evaluate  # noqa: E402
+
+
+def load_tests(loader, standard_tests, pattern):  # noqa: ARG001
+    """Unittest discovery must not report Ran 0 tests / OK (exit 0)."""
+    raise RuntimeError(
+        "not a unittest module; run as python recipe/bin/test_claim_gate.py"
+    )
 
 
 def run_hook(payload: dict) -> dict:

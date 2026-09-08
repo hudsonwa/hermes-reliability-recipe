@@ -391,6 +391,36 @@ else
   FAIL=1
 fi
 
+echo "== GT14 truth_run_wrap fail-closed when truth missing (#5) =="
+# Missing truth must exit non-zero and MUST NOT run the wrapped command.
+# No passthrough env. Actionable stderr names fetch-truth.sh or TRUTH_BIN=.
+GT14_FAIL=0
+GT14_SENTINEL="$TMP/gt14-wrapped-ran"
+rm -f "$GT14_SENTINEL"
+GT14_RC=0
+PATH=/usr/bin:/bin TRUTH_BIN=/no/such/truth-bin \
+  bash "$ROOT/recipe/bin/truth_run_wrap.sh" -- \
+  sh -c "echo RAN > \"$GT14_SENTINEL\"" \
+  >"$TMP/gt14.out" 2>"$TMP/gt14.err" || GT14_RC=$?
+if [[ -f "$GT14_SENTINEL" ]]; then
+  echo "FAIL GT14 wrapped command ran despite missing truth"
+  GT14_FAIL=1
+fi
+if [[ "$GT14_RC" -eq 0 ]]; then
+  echo "FAIL GT14 exit 0 on missing truth (want non-zero, 127 is fine)"
+  GT14_FAIL=1
+fi
+if ! grep -qE 'fetch-truth\.sh|TRUTH_BIN' "$TMP/gt14.err"; then
+  echo "FAIL GT14 stderr missing fetch-truth.sh or TRUTH_BIN= hint"
+  cat "$TMP/gt14.err"
+  GT14_FAIL=1
+fi
+if [[ "$GT14_FAIL" -eq 0 ]]; then
+  echo "PASS GT14 (rc=$GT14_RC)"
+else
+  FAIL=1
+fi
+
 if [[ "$FAIL" -ne 0 ]]; then
   echo "GT SUITE FAILED"
   exit 1

@@ -23,6 +23,8 @@ Writes `recipe/bin/truth` and `recipe/bin/truth-mcp` in the repo. `install.sh` c
 Truth is **layer 2** (receipts): records real command output so the agent cannot invent “tests passed” without a receipt.  
 The claim gate is **layer 1** and does **not** require truth.
 
+`recipe/bin/truth_run_wrap.sh` is fail-closed: if the truth binary is missing it prints how to fetch (`scripts/fetch-truth.sh` or `TRUTH_BIN=`) and **exits 127 without running the wrapped command**. There is no passthrough env. Clones without truth use doctor `--allow-no-truth`; they should not wrap pytest through this script until truth is installed.
+
 **Important:** Needing a modern Linux glibc for prebuilt truth is a **truth binary** constraint, not a Hermes Agent requirement. Hermes can run elsewhere; this download only cares where *truth* runs.
 
 ## Tradeoffs

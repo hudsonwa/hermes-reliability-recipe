@@ -462,17 +462,19 @@ GT15_BIN="$TMP/gt15-bin"
 mkdir -p "$GT15_ROOT/$GT15_NAME/bin" "$GT15_BIN"
 cp -f "$ROOT/recipe/bin/pre_verify_claim_gate.py" "$GT15_ROOT/$GT15_NAME/bin/"
 cp -f "$ROOT/recipe/bin/test_claim_gate.py" "$GT15_ROOT/$GT15_NAME/bin/"
-printf '%s\n' '#!/bin/sh
-if [ "$1" = "-c" ] && echo "$2" | grep -q pytest; then exit 1; fi
-exit 0
-' >"$GT15_BIN/python3"
+printf '%s\n' "#!/bin/sh
+if [ \"\$1\" = \"-c\" ] && echo \"\$2\" | grep -q pytest; then exit 1; fi
+exec $PY \"\$@\"
+" >"$GT15_BIN/python3"
 chmod +x "$GT15_BIN/python3"
 cat >"$GT15_ROOT/$GT15_NAME/config.yaml" <<'YAML'
 agent:
   coding_instructions: |
     For tests in a project: wrap -- python3 -m pytest -q
 YAML
-GT15_OUT=$(PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
+# HERMES_PYTHON keeps doctor yaml/stack checks on the suite interpreter.
+# PATH python3 is the stub so "python3 -m pytest" import-check fails.
+GT15_OUT=$(HERMES_PYTHON="$PY" PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
   bash "$ROOT/scripts/doctor.sh" --profile "$GT15_NAME" --skip-patch --allow-no-truth 2>&1 || true)
 if ! echo "$GT15_OUT" | grep -q "pytest_python_cannot_import"; then
   echo "FAIL GT15a doctor did not fail pytest_python_cannot_import"
@@ -485,7 +487,7 @@ agent:
   coding_instructions: |
     Proof-before-claim. Quote tool output.
 YAML
-GT15_OUT2=$(PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
+GT15_OUT2=$(HERMES_PYTHON="$PY" PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
   bash "$ROOT/scripts/doctor.sh" --profile "$GT15_NAME" --skip-patch --allow-no-truth 2>&1 || true)
 if echo "$GT15_OUT2" | grep -q "pytest_python_cannot_import"; then
   echo "FAIL GT15b no-pytest instruction still failed pytest_python_cannot_import"
@@ -504,7 +506,7 @@ agent:
     For pytest: wrap -- "$HERMES_VENV/python" -m pytest -q
     (a python where import pytest succeeds).
 YAML
-GT15_OUT3=$(PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
+GT15_OUT3=$(HERMES_PYTHON="$PY" PATH="$GT15_BIN:/usr/bin:/bin" HERMES_PROFILES_ROOT="$GT15_ROOT" \
   bash "$ROOT/scripts/doctor.sh" --profile "$GT15_NAME" --skip-patch --allow-no-truth 2>&1 || true)
 if echo "$GT15_OUT3" | grep -q "pytest_python_cannot_import"; then
   echo "FAIL GT15c venv/import-ok instructions still failed pytest_python_cannot_import"

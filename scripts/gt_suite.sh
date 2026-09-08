@@ -301,6 +301,45 @@ else
   FAIL=1
 fi
 
+echo "== GT12 doctor fails when profile gate hash lags recipe (#3) =="
+# Isolated fake profile: older/different gate in profile bin vs recipe/bin.
+# Doctor must fail-closed profile_gate_stale. Matching hashes must not use that code.
+# Optional skip: HRR_DOCTOR_ALLOW_STALE_BINS=1 (intentionally diverged profiles).
+GT12_FAIL=0
+GT12_ROOT="$TMP/gt12-profiles"
+GT12_NAME="gt12g"
+mkdir -p "$GT12_ROOT/$GT12_NAME/bin"
+echo "agent: {}" >"$GT12_ROOT/$GT12_NAME/config.yaml"
+printf '# deliberately stale profile gate copy\nprint("old-gate")\n' >"$GT12_ROOT/$GT12_NAME/bin/pre_verify_claim_gate.py"
+GT12_OUT=$(HERMES_PROFILES_ROOT="$GT12_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT12_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if ! echo "$GT12_OUT" | grep -q "profile_gate_stale"; then
+  echo "FAIL GT12a stale gate not flagged profile_gate_stale"
+  echo "$GT12_OUT" | tail -20
+  GT12_FAIL=1
+fi
+cp -f "$ROOT/recipe/bin/pre_verify_claim_gate.py" "$GT12_ROOT/$GT12_NAME/bin/pre_verify_claim_gate.py"
+GT12_OUT2=$(HERMES_PROFILES_ROOT="$GT12_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT12_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT12_OUT2" | grep -q "profile_gate_stale"; then
+  echo "FAIL GT12b false profile_gate_stale when hashes match"
+  echo "$GT12_OUT2" | tail -20
+  GT12_FAIL=1
+fi
+printf '# stale again for skip-env\nprint("old-gate")\n' >"$GT12_ROOT/$GT12_NAME/bin/pre_verify_claim_gate.py"
+GT12_OUT3=$(HRR_DOCTOR_ALLOW_STALE_BINS=1 HERMES_PROFILES_ROOT="$GT12_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT12_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT12_OUT3" | grep -q "profile_gate_stale"; then
+  echo "FAIL GT12c HRR_DOCTOR_ALLOW_STALE_BINS=1 still flagged profile_gate_stale"
+  echo "$GT12_OUT3" | tail -20
+  GT12_FAIL=1
+fi
+if [[ "$GT12_FAIL" -eq 0 ]]; then
+  echo "PASS GT12"
+else
+  FAIL=1
+fi
+
 if [[ "$FAIL" -ne 0 ]]; then
   echo "GT SUITE FAILED"
   exit 1

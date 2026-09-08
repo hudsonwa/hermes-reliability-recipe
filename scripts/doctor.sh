@@ -22,6 +22,9 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "  --allow-no-truth   Do not fail if truth binary is missing/unrunnable"
       echo "                     (claim-gate-only installs on older GLIBC)"
+      echo "  HRR_DOCTOR_ALLOW_STALE_BINS=1"
+      echo "                     Skip profile vs recipe sha256 of claim-gate bins"
+      echo "                     (intentionally diverged profiles only; default is fail)"
       exit 0
       ;;
     *) echo "unknown: $1" >&2; exit 2 ;;
@@ -152,6 +155,26 @@ PY
     ok "profile stack config"
   else
     fail "profile_stack:$DIAG"
+  fi
+fi
+
+# profile claim-gate file vs recipe (#3). Existence is profile_gate_missing
+# (DIAG). Byte mismatch is fail-closed profile_gate_stale. Skip only when
+# HRR_DOCTOR_ALLOW_STALE_BINS=1 (intentionally diverged profiles).
+if [[ "${HRR_DOCTOR_ALLOW_STALE_BINS:-0}" == "1" ]]; then
+  note "WARN: skipping profile bin hash vs recipe (HRR_DOCTOR_ALLOW_STALE_BINS=1)"
+else
+  RECIPE_GATE="$RECIPE_ROOT/recipe/bin/pre_verify_claim_gate.py"
+  PROFILE_GATE="$HOME_P/bin/pre_verify_claim_gate.py"
+  if [[ -f "$RECIPE_GATE" && -f "$PROFILE_GATE" ]]; then
+    _rg="$(file_sha256 "$RECIPE_GATE")"
+    _pg="$(file_sha256 "$PROFILE_GATE")"
+    if [[ "$_rg" != "$_pg" ]]; then
+      fail "profile_gate_stale"
+      note "hint: profile bin/pre_verify_claim_gate.py does not match recipe/bin; .truth-stamps/05-doctor.PASS is last-writer — re-run doctor per profile"
+    else
+      ok "profile gate hash matches recipe"
+    fi
   fi
 fi
 

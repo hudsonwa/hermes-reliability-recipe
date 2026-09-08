@@ -32,9 +32,10 @@ One command replaces “I think it’s installed.” Failures name the missing p
 5. **Truth binary** — present **and runnable** (not just `chmod +x`)
 6. **Truth-mcp binary** present
 7. **Profile stack** — `pre_verify` hook, `verify_on_stop`, truth MCP (unless `--allow-no-truth`), coding_instructions, state, gate in profile bin
-8. **Always-on pre_verify** in Hermes source (unless `--skip-patch`)
-9. **Recipe template** hazard lines
-10. **Profile working-style soft block** — one of three failure codes (see below)
+8. **Profile gate hash** — sha256 of profile `bin/pre_verify_claim_gate.py` must match `recipe/bin/pre_verify_claim_gate.py`. Mismatch = `profile_gate_stale` (fail-closed). Skip with `HRR_DOCTOR_ALLOW_STALE_BINS=1` for an intentionally diverged profile only.
+9. **Always-on pre_verify** in Hermes source (unless `--skip-patch`)
+10. **Recipe template** hazard lines
+11. **Profile working-style soft block** — one of three failure codes (see below)
 
 ## Working-style soft block codes
 
@@ -60,6 +61,20 @@ It prints the found binary and the PATH line to add; only when none exists does 
 export PATH="$HOME/.hermes/hermes-agent/venv/bin:$PATH"
 ./scripts/doctor.sh --profile YOUR_PROFILE
 ```
+
+## Profile gate hash (`profile_gate_stale`)
+
+Doctor used to PASS when the live profile still ran an old `pre_verify_claim_gate.py`. It now sha256-compares that file to the recipe copy and fails `profile_gate_stale` on mismatch.
+
+`.truth-stamps/05-doctor.PASS` is **last-writer**: a PASS for profile A does not mean profile B is hashed-fresh. Re-run doctor per profile.
+
+Intentionally diverged profiles (you keep a patched gate on purpose):
+
+```bash
+HRR_DOCTOR_ALLOW_STALE_BINS=1 ./scripts/doctor.sh --profile YOUR_PROFILE
+```
+
+Default is fail. Do not set this on a normal install.
 
 ## Tradeoffs
 
@@ -93,6 +108,9 @@ Doctor is the “is the lie detector plugged in?” button. Green means the piec
 
 # Claim-gate-only: do not fail if truth / truth-mcp missing or not runnable
 ./scripts/doctor.sh --profile YOUR_PROFILE --allow-no-truth
+
+# Intentionally diverged profile gate (skip sha256 vs recipe)
+HRR_DOCTOR_ALLOW_STALE_BINS=1 ./scripts/doctor.sh --profile YOUR_PROFILE
 ```
 
 ## Output

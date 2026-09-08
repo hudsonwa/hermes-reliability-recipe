@@ -159,8 +159,9 @@ PY
 fi
 
 # profile claim-gate file vs recipe (#3). Existence is profile_gate_missing
-# (DIAG). Byte mismatch is fail-closed profile_gate_stale. Skip only when
-# HRR_DOCTOR_ALLOW_STALE_BINS=1 (intentionally diverged profiles).
+# (DIAG). Byte mismatch is fail-closed profile_gate_stale.
+# profile test_claim_gate.py vs recipe (#4): missing OR mismatch =
+# profile_gate_tests_stale. Same skip: HRR_DOCTOR_ALLOW_STALE_BINS=1.
 if [[ "${HRR_DOCTOR_ALLOW_STALE_BINS:-0}" == "1" ]]; then
   note "WARN: skipping profile bin hash vs recipe (HRR_DOCTOR_ALLOW_STALE_BINS=1)"
 else
@@ -174,6 +175,23 @@ else
       note "hint: profile bin/pre_verify_claim_gate.py does not match recipe/bin; .truth-stamps/05-doctor.PASS is last-writer — re-run doctor per profile"
     else
       ok "profile gate hash matches recipe"
+    fi
+  fi
+  RECIPE_GATE_TESTS="$RECIPE_ROOT/recipe/bin/test_claim_gate.py"
+  PROFILE_GATE_TESTS="$HOME_P/bin/test_claim_gate.py"
+  if [[ -f "$RECIPE_GATE_TESTS" ]]; then
+    if [[ ! -f "$PROFILE_GATE_TESTS" ]]; then
+      fail "profile_gate_tests_stale"
+      note "hint: profile bin/test_claim_gate.py missing (does not match recipe/bin)"
+    else
+      _rt="$(file_sha256 "$RECIPE_GATE_TESTS")"
+      _pt="$(file_sha256 "$PROFILE_GATE_TESTS")"
+      if [[ "$_rt" != "$_pt" ]]; then
+        fail "profile_gate_tests_stale"
+        note "hint: profile bin/test_claim_gate.py does not match recipe/bin; .truth-stamps/05-doctor.PASS is last-writer — re-run doctor per profile"
+      else
+        ok "profile gate tests hash matches recipe"
+      fi
     fi
   fi
 fi

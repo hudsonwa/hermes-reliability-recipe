@@ -340,6 +340,57 @@ else
   FAIL=1
 fi
 
+echo "== GT13 doctor fails when profile test_claim_gate.py lags or is absent (#4) =="
+# Sibling of #3: distinct fail code profile_gate_tests_stale.
+# Same skip env HRR_DOCTOR_ALLOW_STALE_BINS=1 (do not add a second dialect).
+GT13_FAIL=0
+GT13_ROOT="$TMP/gt13-profiles"
+GT13_NAME="gt13t"
+mkdir -p "$GT13_ROOT/$GT13_NAME/bin"
+echo "agent: {}" >"$GT13_ROOT/$GT13_NAME/config.yaml"
+cp -f "$ROOT/recipe/bin/pre_verify_claim_gate.py" "$GT13_ROOT/$GT13_NAME/bin/pre_verify_claim_gate.py"
+# a) absent unit file
+rm -f "$GT13_ROOT/$GT13_NAME/bin/test_claim_gate.py"
+GT13_OUT=$(HERMES_PROFILES_ROOT="$GT13_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT13_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if ! echo "$GT13_OUT" | grep -q "profile_gate_tests_stale"; then
+  echo "FAIL GT13a absent test_claim_gate.py not flagged"
+  echo "$GT13_OUT"
+  GT13_FAIL=1
+fi
+# b) mismatch
+printf '# stale unit file\nprint("old-tests")\n' >"$GT13_ROOT/$GT13_NAME/bin/test_claim_gate.py"
+GT13_OUT2=$(HERMES_PROFILES_ROOT="$GT13_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT13_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if ! echo "$GT13_OUT2" | grep -q "profile_gate_tests_stale"; then
+  echo "FAIL GT13b stale test_claim_gate.py not flagged"
+  echo "$GT13_OUT2"
+  GT13_FAIL=1
+fi
+# c) matching hash
+cp -f "$ROOT/recipe/bin/test_claim_gate.py" "$GT13_ROOT/$GT13_NAME/bin/test_claim_gate.py"
+GT13_OUT3=$(HERMES_PROFILES_ROOT="$GT13_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT13_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT13_OUT3" | grep -q "profile_gate_tests_stale"; then
+  echo "FAIL GT13c false profile_gate_tests_stale when hashes match"
+  echo "$GT13_OUT3"
+  GT13_FAIL=1
+fi
+# d) skip env on absent file
+rm -f "$GT13_ROOT/$GT13_NAME/bin/test_claim_gate.py"
+GT13_OUT4=$(HRR_DOCTOR_ALLOW_STALE_BINS=1 HERMES_PROFILES_ROOT="$GT13_ROOT" \
+  bash "$ROOT/scripts/doctor.sh" --profile "$GT13_NAME" --skip-patch --allow-no-truth 2>&1 || true)
+if echo "$GT13_OUT4" | grep -q "profile_gate_tests_stale"; then
+  echo "FAIL GT13d skip env still flagged profile_gate_tests_stale"
+  echo "$GT13_OUT4"
+  GT13_FAIL=1
+fi
+if [[ "$GT13_FAIL" -eq 0 ]]; then
+  echo "PASS GT13"
+else
+  FAIL=1
+fi
+
 if [[ "$FAIL" -ne 0 ]]; then
   echo "GT SUITE FAILED"
   exit 1

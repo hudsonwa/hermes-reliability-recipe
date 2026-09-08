@@ -33,9 +33,10 @@ One command replaces “I think it’s installed.” Failures name the missing p
 6. **Truth-mcp binary** present
 7. **Profile stack** — `pre_verify` hook, `verify_on_stop`, truth MCP (unless `--allow-no-truth`), coding_instructions, state, gate in profile bin
 8. **Profile gate hash** — sha256 of profile `bin/pre_verify_claim_gate.py` must match `recipe/bin/pre_verify_claim_gate.py`. Mismatch = `profile_gate_stale` (fail-closed). Skip with `HRR_DOCTOR_ALLOW_STALE_BINS=1` for an intentionally diverged profile only.
-9. **Always-on pre_verify** in Hermes source (unless `--skip-patch`)
-10. **Recipe template** hazard lines
-11. **Profile working-style soft block** — one of three failure codes (see below)
+9. **Profile gate-tests hash** — sha256 of profile `bin/test_claim_gate.py` vs recipe. Missing or mismatch = `profile_gate_tests_stale`. Same skip env as item 8 (not a second dialect).
+10. **Always-on pre_verify** in Hermes source (unless `--skip-patch`)
+11. **Recipe template** hazard lines
+12. **Profile working-style soft block** — one of three failure codes (see below)
 
 ## Working-style soft block codes
 
@@ -75,6 +76,8 @@ HRR_DOCTOR_ALLOW_STALE_BINS=1 ./scripts/doctor.sh --profile YOUR_PROFILE
 ```
 
 Default is fail. Do not set this on a normal install.
+
+The same skip env covers `test_claim_gate.py` (`profile_gate_tests_stale` when the profile copy is missing or its hash differs). There is not a second skip dialect.
 
 ## Tradeoffs
 

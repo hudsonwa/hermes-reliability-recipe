@@ -144,6 +144,13 @@ The gate still works.
 
 ---
 
+### Optional: operating pack (v0.3.0)
+
+For bots on smaller or local models, `--pack operating --owner "Name" --workdir /abs/path`
+also installs short working habits (proof before claims, plan-only, browser etiquette,
+CAPTCHA policy `handoff|tick`, default `handoff`) and `truth-mcp-workdir`.
+Opt-in, per profile. See [recipe/packs/operating/README.md](recipe/packs/operating/README.md).
+
 ## Technical notes
 
 ### Several profiles

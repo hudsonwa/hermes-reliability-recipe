@@ -32,6 +32,7 @@ test-quick:
 	grep -q 'ensure_working_style_soft_block' scripts/lib.sh
 	grep -q 'ensure_working_style_soft_block' scripts/reliability-toggle.sh
 	grep -q 'profile_working_style_soft_missing\|profile working-style soft block' scripts/doctor.sh
+	bash recipe/packs/operating/tests/test_pack.sh
 	bash scripts/check-scrub.sh
 	@echo "test-quick OK"
 

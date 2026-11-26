@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""pc-run — one-shot CLI driver for the progress-continue plugin.
+
+`hermes chat -q` single-query mode has no REPL to inject into, so this wrapper runs the
+query, then, while the plugin's last decision for the session says CONTINUE, resumes the
+same session with the continue message. Gateway/REPL sessions don't need this.
+
+usage: pc-run -p PROFILE [--max-turns N] [--hermes hermes] -- "task text"
+"""
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "progress-continue"))
+import core  # noqa: E402
+
+
+def home_for(profile: str) -> Path:
+    if profile in ("", "default"):
+        return Path.home() / ".hermes"
+    return Path.home() / ".hermes" / "profiles" / profile
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-p", "--profile", required=True)
+    ap.add_argument("--max-turns", type=int, default=None)
+    ap.add_argument("--hermes", default="hermes")
+    ap.add_argument("--max-rounds", type=int, default=50, help="safety net; plugin cap normally stops first")
+    ap.add_argument("--idle", type=int, default=600, help="seconds without a new decision = finished")
+    ap.add_argument("task")
+    a = ap.parse_args()
+    home = home_for(a.profile)
+    marker = home / "progress_continue" / "LAST_SESSION"
+    if marker.exists():
+        marker.unlink()
+    base = [a.hermes, "-p", a.profile, "chat", "--oneshot", "-Q", "--yolo"]
+    if a.max_turns:
+        base += ["--max-turns", str(a.max_turns)]
+    msg, sid = a.task, None
+    for rnd in range(a.max_rounds):
+        cmd = base + (["--resume", sid] if sid else []) + ["-q", msg]
+        t0 = time.time()
+        print(f"[pc-run] round {rnd} start", flush=True)
+        r = subprocess.run(cmd, text=True, capture_output=True)
+        print(f"[pc-run] round {rnd} exit={r.returncode} {time.time()-t0:.0f}s\n{r.stdout[-1500:]}{r.stderr[-800:] if r.returncode else ''}", flush=True)
+        if not marker.exists():
+            print("[pc-run] turn ended without hitting the step limit -> done")
+            return 0
+        sid = marker.read_text().strip()
+        st = core.load_state(home, sid)
+        d = st.last_decision if st else None
+        if not d or d.get("at", 0) < t0:
+            print("[pc-run] no new limit decision this round -> done")
+            return 0
+        print(f"[pc-run] decision: {json.dumps({k: d[k] for k in ('action', 'reason', 'stuck_on')})}")
+        while d["action"] == "continue" and d.get("delivered"):
+            # gateway/REPL already queued the follow-up turn: wait for the next decision
+            # or for the session to go quiet (turn finished under the limit).
+            last_at, waited = d["at"], 0
+            while waited < a.idle:
+                time.sleep(10); waited += 10
+                st = core.load_state(home, sid)
+                if st and st.last_decision and st.last_decision["at"] > last_at:
+                    break
+            else:
+                print(f"[pc-run] no new limit hit for {a.idle}s after an auto-continue -> done")
+                return 0
+            d = st.last_decision
+            print(f"[pc-run] decision: {json.dumps({k: d[k] for k in ('action', 'reason', 'stuck_on')})}", flush=True)
+        if d["action"] != "continue":
+            print(core.stop_report(d))
+            return 3
+        msg = core.continue_message(d)
+    return 4
+
+
+if __name__ == "__main__":
+    sys.exit(main())

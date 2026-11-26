@@ -4,6 +4,7 @@
 #   install.sh --profile NAME [--lab-yolo] [--fetch-truth] [--skip-truth]
 #   install.sh --profile NAME1,NAME2,NAME3 [--lab-yolo]
 #   install.sh --all-profiles [--lab-yolo]
+#   install.sh --profile NAME --pack operating --owner "Name" --workdir /abs/path [--captcha handoff|tick] [--module progress-continue]
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib.sh
@@ -13,6 +14,7 @@ PROFILE=""
 ALL_PROFILES=0
 LAB_YOLO="${LAB_YOLO:-0}"
 FETCH_TRUTH=1
+PACK="" PACK_OWNER="" PACK_WORKDIR="" PACK_CAPTCHA="handoff" PACK_MODULE_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile) PROFILE="$2"; shift 2 ;;
@@ -20,6 +22,11 @@ while [[ $# -gt 0 ]]; do
     --lab-yolo) LAB_YOLO=1; shift ;;
     --fetch-truth) FETCH_TRUTH=1; shift ;;
     --skip-truth) FETCH_TRUTH=0; shift ;;
+    --pack) PACK="$2"; shift 2 ;;
+    --owner) PACK_OWNER="$2"; shift 2 ;;
+    --workdir) PACK_WORKDIR="$2"; shift 2 ;;
+    --captcha) PACK_CAPTCHA="$2"; shift 2 ;;
+    --module) PACK_MODULE_ARGS+=(--module "$2"); shift 2 ;;
     -h|--help)
       echo "usage: $0 --profile NAME [--lab-yolo] [--skip-truth]"
       echo "       $0 --profile NAME1,NAME2,NAME3 [--lab-yolo]"
@@ -30,6 +37,8 @@ while [[ $# -gt 0 ]]; do
       echo "  --all-profiles         Discover and install into all profiles with config.yaml"
       echo "  --lab-yolo             Also set approvals.mode=off (lab machines only)"
       echo "  --skip-truth           Skip truth binary download (already fetched)"
+      echo "  --pack operating       Also install the opt-in operating pack (needs --owner, --workdir;"
+      echo "                         --captcha handoff|tick, default handoff). One profile only."
       exit 0
       ;;
     *) echo "unknown: $1" >&2; exit 2 ;;
@@ -53,6 +62,12 @@ if [[ ${#PROFILES_LIST[@]} -eq 0 ]]; then
 fi
 
 require_lab_yolo_confirm || exit 2
+
+if [[ -n "$PACK" ]]; then
+  [[ "$PACK" == "operating" ]] || { echo "unknown pack: $PACK (available: operating)" >&2; exit 2; }
+  [[ ${#PROFILES_LIST[@]} -eq 1 ]] || { echo "--pack installs into one profile at a time" >&2; exit 2; }
+  [[ -n "$PACK_OWNER" && -n "$PACK_WORKDIR" ]] || { echo "--pack operating needs --owner and --workdir" >&2; exit 2; }
+fi
 
 if [[ "${#PROFILES_LIST[@]}" -gt 1 ]]; then
   echo "Installing into ${#PROFILES_LIST[@]} profiles: ${PROFILES_LIST[*]}"
@@ -219,7 +234,9 @@ SOULUP
 INSTALL_OK=0
 INSTALL_FAIL=0
 for _p in "${PROFILES_LIST[@]}"; do
-  if install_one_profile "$_p"; then
+  if install_one_profile "$_p" && { [[ -z "$PACK" ]] || \
+      "$RECIPE_ROOT/recipe/packs/$PACK/install-pack.sh" --profile "$_p" \
+        --owner "$PACK_OWNER" --workdir "$PACK_WORKDIR" --captcha "$PACK_CAPTCHA" "${PACK_MODULE_ARGS[@]+"${PACK_MODULE_ARGS[@]}"}"; }; then
     INSTALL_OK=$((INSTALL_OK + 1))
   else
     INSTALL_FAIL=$((INSTALL_FAIL + 1))

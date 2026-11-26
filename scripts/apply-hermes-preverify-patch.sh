@@ -28,12 +28,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-LOOP="$HERMES_ROOT/agent/conversation_loop.py"
-if [[ ! -f "$LOOP" ]]; then
-  echo "FAIL: conversation_loop not found at $LOOP"
+# Hermes ≥0.21 moved the edit-gated pre_verify into turn_stop_gates.py.
+LOOP=""
+if [[ -f "$HERMES_ROOT/agent/turn_stop_gates.py" ]] && grep -qE 'has_hook\(\s*["'"'"']pre_verify["'"'"']' "$HERMES_ROOT/agent/turn_stop_gates.py"; then
+  LOOP="$HERMES_ROOT/agent/turn_stop_gates.py"
+elif [[ -f "$HERMES_ROOT/agent/conversation_loop.py" ]]; then
+  LOOP="$HERMES_ROOT/agent/conversation_loop.py"
+fi
+if [[ -z "$LOOP" || ! -f "$LOOP" ]]; then
+  echo "FAIL: pre_verify loop file not found under $HERMES_ROOT/agent"
   write_stamp "$RECIPE_ROOT" "03-patch" "FAIL" "missing_loop"
   exit 1
 fi
+echo "patch-target: $LOOP"
 
 edit_gated() {
   grep -qE 'if _edited and has_hook\(["'\'']pre_verify["'\'']\)' "$LOOP"
@@ -111,12 +118,16 @@ import os, re
 from pathlib import Path
 p = Path(os.environ["LOOP"])
 text = p.read_text()
-# common form
+# Attempt counter is `attempt` (hermes ≤0.21.3 turn_stop_gates) or `_attempt`
+# (older conversation_loop shape) — accept both. Preserve whichever the tree
+# uses so the replacement is a minimal one-token change.
 pat = re.compile(
-    r'if\s+_edited\s+and\s+has_hook\(\s*["\']pre_verify["\']\s*\)\s+and\s+_attempt\s*<\s*max_verify_nudges\(\)\s*:'
+    r'if\s+_edited\s+and\s+has_hook\(\s*["\']pre_verify["\']\s*\)\s+and\s+'
+    r'(_attempt|attempt)\s*<\s*max_verify_nudges\(\)\s*:'
 )
-rep = 'if has_hook("pre_verify") and _attempt < max_verify_nudges():'
-new, n = pat.subn(rep, text, count=1)
+def _rep(m):
+    return f'if has_hook("pre_verify") and {m.group(1)} < max_verify_nudges():'
+new, n = pat.subn(_rep, text, count=1)
 if n == 0:
     pat2 = re.compile(
         r'if\s+_edited\s+and\s+has_hook\(\s*["\']pre_verify["\']\s*\)\s*:'

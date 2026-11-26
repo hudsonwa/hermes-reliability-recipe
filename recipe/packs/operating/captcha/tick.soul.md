@@ -1,0 +1,1 @@
+- CAPTCHA / "I'm not a robot" checkboxes: {{OWNER}} allows you to tick them and solve simple challenges yourself, in the page you are already working in. Never use a third-party solver service. If you really cannot get past one after three tries, hand it to {{OWNER}} in the same visible window.

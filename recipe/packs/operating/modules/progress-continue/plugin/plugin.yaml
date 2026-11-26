@@ -1,0 +1,7 @@
+name: progress-continue
+version: 0.1.0
+description: "Dynamic step limit: when a turn hits agent.max_turns, auto-continue if the bot is making real progress (plan ticks, files changed, new tool results), stop with a 'stuck on X' report if not."
+author: "hermes-reliability-recipe operating pack"
+provides_hooks:
+  - post_tool_call
+  - on_session_end

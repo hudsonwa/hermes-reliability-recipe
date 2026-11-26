@@ -231,21 +231,27 @@ PY
   fi
 fi
 
-# hermes patch
-LOOP="${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}/agent/conversation_loop.py"
-if [[ -f "$LOOP" ]]; then
-  if grep -qE 'if _edited and has_hook\(["'\'']pre_verify["'\'']\)' "$LOOP"; then
-    fail "pre_verify_still_edit_gated"
-  elif grep -qE 'if has_hook\(["'\'']pre_verify["'\'']\)' "$LOOP"; then
-    ok "always-on pre_verify"
+# hermes patch (0.21+: turn_stop_gates.py; older: conversation_loop.py)
+HERMES_ROOT="${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}"
+LOOP=""
+if [[ -f "$HERMES_ROOT/agent/turn_stop_gates.py" ]] && grep -qE 'has_hook\(["'"'"']pre_verify["'"'"']' "$HERMES_ROOT/agent/turn_stop_gates.py"; then
+  LOOP="$HERMES_ROOT/agent/turn_stop_gates.py"
+elif [[ -f "$HERMES_ROOT/agent/conversation_loop.py" ]]; then
+  LOOP="$HERMES_ROOT/agent/conversation_loop.py"
+fi
+if [[ -n "$LOOP" && -f "$LOOP" ]]; then
+  if grep -qE 'if _edited and has_hook\(["'"'"']pre_verify["'"'"']' "$LOOP"; then
+    fail "pre_verify_still_edit_gated ($LOOP)"
+  elif grep -qE 'if has_hook\(["'"'"']pre_verify["'"'"']' "$LOOP"; then
+    ok "always-on pre_verify ($LOOP)"
   else
     fail "pre_verify_condition_not_found"
   fi
 else
   if [[ "$REQUIRE_PATCH" == "1" ]]; then
-    fail "conversation_loop_missing"
+    fail "pre_verify_loop_missing"
   else
-    note "skip: no conversation_loop at $LOOP"
+    note "skip: no pre_verify loop under $HERMES_ROOT/agent"
   fi
 fi
 

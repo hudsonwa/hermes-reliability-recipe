@@ -90,17 +90,23 @@ else
 fi
 
 echo "== GT7 always-on pre_verify (optional if Hermes present) =="
-LOOP="${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}/agent/conversation_loop.py"
-if [[ -f "$LOOP" ]]; then
-  if grep -qE 'if _edited and has_hook\(["'\'']pre_verify["'\'']\)' "$LOOP"; then
+HERMES_ROOT="${HERMES_AGENT_ROOT:-$HOME/.hermes/hermes-agent}"
+LOOP=""
+if [[ -f "$HERMES_ROOT/agent/turn_stop_gates.py" ]] && grep -qE 'has_hook\(["'"'"']pre_verify["'"'"']' "$HERMES_ROOT/agent/turn_stop_gates.py"; then
+  LOOP="$HERMES_ROOT/agent/turn_stop_gates.py"
+elif [[ -f "$HERMES_ROOT/agent/conversation_loop.py" ]]; then
+  LOOP="$HERMES_ROOT/agent/conversation_loop.py"
+fi
+if [[ -n "$LOOP" && -f "$LOOP" ]]; then
+  if grep -qE 'if _edited and has_hook\(["'"'"']pre_verify["'"'"']' "$LOOP"; then
     echo "FAIL GT7: pre_verify still edit-gated in $LOOP"; FAIL=1
-  elif grep -qE 'if has_hook\(["'\'']pre_verify["'\'']\)' "$LOOP"; then
-    echo "PASS GT7 always-on pre_verify"
+  elif grep -qE 'if has_hook\(["'"'"']pre_verify["'"'"']' "$LOOP"; then
+    echo "PASS GT7 always-on pre_verify ($LOOP)"
   else
     echo "FAIL GT7: could not find pre_verify condition"; FAIL=1
   fi
 else
-  echo "SKIP GT7 (no conversation_loop at $LOOP)"
+  echo "SKIP GT7 (no pre_verify loop under $HERMES_ROOT/agent)"
 fi
 
 echo "== GT8 selfheal ignores ambient HERMES_HOME (if profile exists) =="
@@ -240,7 +246,7 @@ printf '# My style\nplain text\n' >"$GT11_WS"
 if [[ "$(ws_soft_block_state "$GT11_WS")" != "marker_missing" ]]; then
   echo "FAIL GT11 state=marker_missing (plain file)"; GT11_FAIL=1
 fi
-# 3) clone-from-randolph: LIE/truth_run lines present but NO marker -> still
+# 3) clone-from-ops-profile: LIE/truth_run lines present but NO marker -> still
 #    marker_missing, so the marker miss is not hidden by existing content.
 printf '# My style\n>>> LIE/HALLUCINATION CAUGHT... <<<\nUse truth_run_wrap for pytest.\n' >>"$GT11_WS"
 if [[ "$(ws_soft_block_state "$GT11_WS")" != "marker_missing" ]]; then

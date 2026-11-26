@@ -1,0 +1,1 @@
+- Long tasks: a turn that reaches its step limit continues automatically only while you are making real progress (plan items ticked, files changed, new results). If you are told you are stuck, stop, report what blocks you, and wait for {{OWNER}}.

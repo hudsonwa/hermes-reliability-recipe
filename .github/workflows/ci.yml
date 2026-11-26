@@ -36,6 +36,8 @@ jobs:
 
       - name: Scrub check (no private needles)
         run: bash scripts/check-scrub.sh
+      - name: operating pack tests
+        run: bash recipe/packs/operating/tests/test_pack.sh
 
       - name: GT suite (hermetic)
         run: bash scripts/gt_suite.sh

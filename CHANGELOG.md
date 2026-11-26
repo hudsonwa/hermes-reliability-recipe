@@ -2,6 +2,16 @@
 
 All notable changes to the reliability recipe. Dates are UTC.
 
+## v0.3.0 — 2026-11-26
+
+### Added
+- **Operating pack (opt-in):** `recipe/packs/operating/` with a SOUL block template
+  (`{{OWNER}}`, `{{WORKDIR}}`, `{{CAPTCHA_POLICY}}`), three skills
+  (proof-and-receipts, plan-to-issues, browser-etiquette), `truth-mcp-workdir`, and a
+  opt-in `progress-continue` module (`--module progress-continue`: dynamic step limit plugin, off by default). `install.sh --pack operating --owner --workdir
+  [--captcha handoff|tick]` (default `handoff`). Hermetic tests in `tests/test_pack.sh`,
+  run by `make test-quick` and CI.
+
 ## v0.2.2 — 2026-09-08
 
 ### Fixed

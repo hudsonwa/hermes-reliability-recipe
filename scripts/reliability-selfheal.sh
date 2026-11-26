@@ -114,8 +114,12 @@ else:
 # Hermes patch-drift check: an update restores the edit-gated pre_verify
 # condition, silently degrading the gate to edit-turns-only. Diagnose it so
 # self-heal can re-apply; doctor.sh already fails on the same condition.
-loop = hermes_root / "agent" / "conversation_loop.py"
-if loop.exists():
+candidates = [
+    hermes_root / "agent" / "turn_stop_gates.py",
+    hermes_root / "agent" / "conversation_loop.py",
+]
+loop = next((c for c in candidates if c.exists() and "pre_verify" in c.read_text(errors="replace")), None)
+if loop is not None:
     text = loop.read_text(errors="replace")
     edit_gated = re.search(
         r'if\s+_edited\s+and\s+has_hook\(\s*["\']pre_verify["\']\s*\)', text

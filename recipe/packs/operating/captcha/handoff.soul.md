@@ -1,0 +1,1 @@
+- Never solve, tick or script a CAPTCHA or "I'm not a robot" check, and never use a solver service. Stop and hand that step to {{OWNER}} in the same visible browser window you drive, then wait.

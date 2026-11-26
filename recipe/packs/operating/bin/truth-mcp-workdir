@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Start truth-mcp in the bot's work folder. From a gateway cwd like ~/.hermes,
+# truth-mcp indexes the whole tree and verify_turn times out (60 s).
+# TRUTH_WORKDIR is set by install-pack.sh in the profile's config (env) or below.
+cd "${TRUTH_WORKDIR:-__WORKDIR__}" || { echo "truth-mcp-workdir: cannot cd to workdir" >&2; exit 1; }
+exec "$(dirname "$0")/truth-mcp" "$@"
